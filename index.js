@@ -1,12 +1,3 @@
-// Importar as bibliotecas necessárias
-//require('dotenv').config(); // Carrega as variáveis do ficheiro .env
-//const express = require('express'); // Framework para criar o servidor
-//const { createClient } = require('@supabase/supabase-js'); // Cliente do Supabase
-
-// Inicializar o servidor Express
-//const app = express();
-// Dizer ao Express para entender pedidos no formato JSON
-//app.use(express.json());
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
