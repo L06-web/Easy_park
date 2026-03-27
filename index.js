@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-
+const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
 // 1. IMPORTAR O CORS (Adiciona esta linha junto com os outros 'require')
 const cors = require('cors');
 
@@ -74,6 +75,44 @@ app.post('/cadastrar', async (req, res) => {
 
 });
 
+
+
+// 1. Configurar a porta USB (Verifique se é COM3, COM4 ou /dev/tty...)
+const port = new SerialPort({ path: 'COM7', baudRate: 9600 });
+const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+
+// ID do sensor que estamos testando (conforme registrado no Supabase)
+const SENSOR_ID_TESTE = 1;
+
+parser.on('data', async (data) => {
+    try {
+        const distancia = parseInt(data);
+        if (isNaN(distancia)) return;
+
+        console.log(`📏 Lendo do Arduino: ${distancia}cm`);
+
+        // IMPORTANTE: Verifique no seu painel do Supabase 
+        // qual é o número exato na coluna 'id_sensor'
+        const SENSOR_ID_TESTE = 1; 
+
+        const { data: resultado, error, status } = await supabase
+            .from('sensor')
+            .update({ ultimo_sinal: new Date().toISOString() }) 
+            .eq('id_sensor', SENSOR_ID_TESTE)
+            .select(); // O .select() nos ajuda a ver se algo foi alterado
+
+        if (error) {
+            console.error('❌ Erro do Supabase:', error.message);
+        } else if (resultado && resultado.length === 0) {
+            console.warn(`⚠️ Atenção: Nenhum sensor encontrado com o ID ${SENSOR_ID_TESTE}. Verifique o ID no banco!`);
+        } else {
+            console.log(`✅ Sucesso! Sensor ${SENSOR_ID_TESTE} atualizado no banco.`);
+        }
+
+    } catch (err) {
+        console.error('❌ Erro no Servidor:', err);
+    }
+});
 
 
 // Ligar o servidor na porta 3000
