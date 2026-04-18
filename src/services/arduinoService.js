@@ -15,7 +15,7 @@ const initArduino = () => {
 
             const ID_ALVO = 1; 
             const estaOcupada = distancia > 0 && distancia <= 30;
-            const novoStatus = estaOcupada ? 'OCUPADA' : 'LIVRE';
+            const novoStatus = estaOcupada ? 'OCUPADO' : 'LIVRE';
 
             // --- LOG DE DEPURAÇÃO ---
             console.log(`📡 Sensor ${ID_ALVO}: ${distancia}cm -> ${novoStatus}`);

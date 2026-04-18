@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-interface ParkingCardProps {
-    livres: number;
-    ocupadas: number;
-    reservadas: number;
-    valorHora: string;
-    onPressReservar: () => void;
-}
+// interface ParkingCardProps {
+//     livres: number;
+//     ocupadas: number;
+//     reservadas: number;
+//     valorHora: string;
+//     onPressReservar: () => void;
+// }
 
 export default function ParkingCard({ 
     livres, 
@@ -16,6 +16,7 @@ export default function ParkingCard({
     valorHora, 
     onPressReservar 
 }) {
+
     const total = livres + ocupadas + reservadas;
   const porcentagemDisponivel = Math.round((livres / total) * 100);
 

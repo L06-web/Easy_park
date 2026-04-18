@@ -5,7 +5,7 @@ exports.listarVagas = async (req, res) => {
         // Buscamos todas as colunas da tabela 'vaga'
         const { data: vagas, error } = await supabase
             .from('vaga')
-            .select('*')
+            .select('*') //id_vaga, status_atual, latitude, longitude
             .order('id_vaga', { ascending: true }); // Organiza por ID
 
         if (error) throw error;
