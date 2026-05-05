@@ -18,12 +18,12 @@ export default function ParkingCard({
 }) {
 
     const total = livres + ocupadas + reservadas;
-  const porcentagemDisponivel = Math.round((livres / total) * 100);
+    const porcentagemDisponivel = Math.round((livres / total) * 100);
 
     return (
     <View style={styles.card}>
         <View style={styles.header}>
-        <Text style={styles.title}>Estacionamento Zona Sul</Text>
+        <Text style={styles.title}>Estacionamento Centro Norte</Text>
         <View style={styles.badgeAberto}>
             <Text style={styles.badgeText}>ABERTO</Text>
         </View>

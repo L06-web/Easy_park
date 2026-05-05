@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function TabOneScreen() {
     const [vagas, setVagas] = useState([]);
     const [loading, setLoading] = useState(true);
-    const API_URL = 'http://172.18.0.202:3000/api/vagas/status';
+    const API_URL = 'http://172.18.0.218:3000/api/vagas/status';
 
     // Coordenada central do seu estacionamento (Exemplo)
     const initialRegion = {
@@ -98,7 +98,7 @@ export default function TabOneScreen() {
                     </MapView>
                 </View>
 ''
-                <View style={styles.filterRow}>
+                {/* <View style={styles.filterRow}>
                     <View style={[styles.badge, { backgroundColor: '#1B3A29' }]}>
                         <View style={[styles.dot, { backgroundColor: COLORS.success }]} />
                         <Text style={[styles.badgeText, { color: COLORS.success }]}>Livre</Text>
@@ -111,7 +111,7 @@ export default function TabOneScreen() {
                         <View style={[styles.dot, { backgroundColor: COLORS.warning }]} />
                         <Text style={[styles.badgeText, { color: COLORS.warning }]}>Reservada</Text>
                     </View>
-                </View>
+                </View> */}
 
                 <Text style={styles.locationTitle}>Centro da Cidade</Text>
 
@@ -119,7 +119,7 @@ export default function TabOneScreen() {
                     livres={campos.livres}
                     ocupadas={campos.ocupadas}
                     reservadas={campos.reservadas}
-                    valorHora="5,00"
+                    valorHora="2,00"
                     onPressStatus={() => { }}
                 />
 
@@ -149,8 +149,8 @@ const styles = StyleSheet.create({
     searchInput: { flex: 1, color: 'white', paddingHorizontal: 10 },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
     mapContainer: {
-        height: 250,
-        borderRadius: 24,
+        height: 400,
+        borderRadius: 20,
         overflow: 'hidden', // Garante que o mapa respeite o border radius
         marginBottom: 20,
         borderWidth: 1,
