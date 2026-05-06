@@ -4,3 +4,4 @@ backup.js
 logs
 projeto
 *.log
+.env
