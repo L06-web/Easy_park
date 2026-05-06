@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function TabOneScreen() {
     const [vagas, setVagas] = useState([]);
     const [loading, setLoading] = useState(true);
-    const API_URL = 'http://172.18.0.218:3000/api/vagas/status';
+    const API_URL = 'http://10.0.0.126:3000/api/vagas/status';
 
     // Coordenada central do seu estacionamento (Exemplo)
     const initialRegion = {
