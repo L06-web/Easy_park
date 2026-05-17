@@ -1,112 +1,145 @@
-import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const API_URL =
-  Constants.expoConfig?.extra?.apiUrl ??
-  process.env.EXPO_PUBLIC_API_URL ??
-  (Platform.OS === 'web' ? 'http://localhost:3000' : 'http://10.0.0.126:3000');
+const FALLBACK_MOBILE_API_URL = 'http://10.0.0.126:3000';
 
-const GOOGLE_CLIENT_ID =
-  Constants.expoConfig?.extra?.googleClientId ??
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ??
-  '';
+function isLocalhostUrl(url) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url ?? '');
+}
+
+function getExpoHostApiUrl() {
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    Constants.manifest2?.extra?.expoClient?.hostUri ??
+    Constants.manifest?.debuggerHost;
+
+  const host = hostUri?.split(':')?.[0];
+  return host ? `http://${host}:3000` : null;
+}
+
+function getApiUrl() {
+  const configuredUrl = process.env.EXPO_PUBLIC_API_URL ?? Constants.expoConfig?.extra?.apiUrl;
+
+  if (Platform.OS === 'web') {
+    return configuredUrl ?? 'http://localhost:3000';
+  }
+
+  if (configuredUrl && !isLocalhostUrl(configuredUrl)) {
+    return configuredUrl;
+  }
+
+  return getExpoHostApiUrl() ?? FALLBACK_MOBILE_API_URL;
+}
+
+const API_URL = getApiUrl();
 
 const SESSION_KEY = 'easypark_user';
-const googleDiscovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-};
 
+/**
+ * Faz uma requisição à API backend
+ */
 async function apiRequest(path, body) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
   const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.erro || data.error || 'Nao foi possivel concluir a autenticacao.');
+    throw new Error(data.erro || data.error || 'Não foi possível concluir a autenticação.');
   }
 
   return data;
 }
 
+/**
+ * Realizar login com email e senha na API
+ */
 export async function loginWithEmail(email, senha) {
-  const data = await apiRequest('/api/usuarios/login', { email, senha });
-  await saveSession(data.usuario);
-  return data.usuario;
+  try {
+    const data = await apiRequest('/api/usuarios/login', { email, senha });
+    await saveSession(data.usuario);
+
+    return data.usuario;
+  } catch (error) {
+    throw new Error(formatRequestError(error));
+  }
 }
 
-export async function registerWithEmail({ nome_completo, email, senha, cpf, telefone }) {
-  const data = await apiRequest('/api/usuarios/cadastrar', {
-    nome_completo,
-    email,
-    senha,
-    cpf,
-    telefone,
-  });
+/**
+ * Registrar novo usuário na API e inserir no banco de dados
+ */
+export async function registerWithEmail({
+  nome_completo,
+  email,
+  senha,
+  cpf,
+  telefone,
+}) {
+  try {
+    const data = await apiRequest('/api/usuarios/cadastrar', {
+      nome_completo,
+      email,
+      senha,
+      cpf,
+      telefone,
+    });
 
-  const usuario = data.usuario ?? { nome_completo, email };
-  await saveSession(usuario);
-  return usuario;
+    const usuario = data.usuario ?? { nome_completo, email };
+    await saveSession(usuario);
+
+    return usuario;
+  } catch (error) {
+    throw new Error(formatRequestError(error));
+  }
 }
 
-export async function signInWithGoogle() {
-  if (!GOOGLE_CLIENT_ID) {
-    throw new Error('Configure EXPO_PUBLIC_GOOGLE_CLIENT_ID para ativar o login com Google.');
+function formatRequestError(error) {
+  if (error.message === 'Network request failed') {
+    return `Não foi possível conectar à API em ${API_URL}. Verifique se o backend está rodando e se o celular está na mesma rede.`;
   }
 
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'easyapp',
-  });
+  return error.message || 'Erro ao concluir a requisição';
+}
 
-  const request = new AuthSession.AuthRequest({
-    clientId: GOOGLE_CLIENT_ID,
-    redirectUri,
-    responseType: AuthSession.ResponseType.Token,
-    scopes: ['profile', 'email'],
-  });
+/**
+ * Salvar dados do usuário na sessão
+ */
+export async function saveSession(user) {
+  try {
+    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(user));
+  } catch (error) {
+    console.warn('Erro ao salvar sessão:', error);
+  }
+}
 
-  const result = await request.promptAsync(googleDiscovery);
-
-  if (result.type !== 'success' || !result.authentication?.accessToken) {
+/**
+ * Obter usuário da sessão
+ */
+export async function getUser() {
+  try {
+    const user = await SecureStore.getItemAsync(SESSION_KEY);
+    return user ? JSON.parse(user) : null;
+  } catch (error) {
+    console.warn('Erro ao obter usuário:', error);
     return null;
   }
-
-  const profileResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-    headers: {
-      Authorization: `Bearer ${result.authentication.accessToken}`,
-    },
-  });
-
-  if (!profileResponse.ok) {
-    throw new Error('Nao foi possivel consultar o perfil do Google.');
-  }
-
-  const googleUser = await profileResponse.json();
-  const data = await apiRequest('/api/usuarios/google', {
-    google_id: googleUser.id,
-    nome_completo: googleUser.name,
-    email: googleUser.email,
-    foto_url: googleUser.picture,
-  });
-
-  await saveSession(data.usuario);
-  return data.usuario;
 }
 
-export async function saveSession(user) {
-  await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(user));
-}
-
-export async function getUser() {
-  const user = await SecureStore.getItemAsync(SESSION_KEY);
-  return user ? JSON.parse(user) : null;
-}
-
+/**
+ * Limpar sessão local
+ */
 export async function logout() {
-  await SecureStore.deleteItemAsync(SESSION_KEY);
+  try {
+    await SecureStore.deleteItemAsync(SESSION_KEY);
+  } catch (error) {
+    console.warn('Erro ao fazer logout:', error);
+  }
 }

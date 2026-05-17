@@ -4,6 +4,35 @@ const supabase = require('../config/supabase');
 
 const logger = require('../../logger'); 
 
+const STATUS = {
+    LIVRE: 'L',
+    OCUPADO: 'O',
+    RESERVADO: 'R',
+};
+
+function normalizarStatus(status) {
+    const mapa = {
+        L: STATUS.LIVRE,
+        LIVRE: STATUS.LIVRE,
+        O: STATUS.OCUPADO,
+        OCUPADO: STATUS.OCUPADO,
+        R: STATUS.RESERVADO,
+        RESERVADO: STATUS.RESERVADO,
+    };
+
+    return mapa[status] || status;
+}
+
+function statusParaTexto(status) {
+    const mapa = {
+        [STATUS.LIVRE]: 'LIVRE',
+        [STATUS.OCUPADO]: 'OCUPADO',
+        [STATUS.RESERVADO]: 'RESERVADO',
+    };
+
+    return mapa[normalizarStatus(status)] || status;
+}
+
 const initArduino = () => {
     const port = new SerialPort({ path: 'COM7', baudRate: 9600, autoOpen: false });
     const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
@@ -33,9 +62,9 @@ const initArduino = () => {
 
             const ID_ALVO = 1; 
             const estaOcupada = distancia > 0 && distancia <= 30;
-            const novoStatus = estaOcupada ? 'OCUPADO' : 'LIVRE';
+            const novoStatus = estaOcupada ? STATUS.OCUPADO : STATUS.LIVRE;
             const statusBooleano = estaOcupada; // true = OCUPADO, false = LIVRE
-            console.log(`📡 Sensor ${ID_ALVO}: ${distancia}cm -> ${novoStatus}`);
+            console.log(`📡 Sensor ${ID_ALVO}: ${distancia}cm -> ${statusParaTexto(novoStatus)}`);
 
             const { data: vagaAntes } = await supabase
                 .from('vaga')
@@ -47,6 +76,13 @@ const initArduino = () => {
                 .from('sensor')
                 .update({ ultimo_sinal: new Date().toISOString() })
                 .eq('id_sensor', ID_ALVO);
+
+            const statusAnterior = normalizarStatus(vagaAntes?.status_atual);
+
+            if (statusAnterior === STATUS.RESERVADO && novoStatus === STATUS.LIVRE) {
+                console.log(`📌 Vaga ${ID_ALVO} mantida como RESERVADO`);
+                return;
+            }
 
             const { error: errorVaga } = await supabase
                 .from('vaga')
@@ -65,19 +101,19 @@ const initArduino = () => {
                 console.error('❌ Erro ao atualizar vaga:', errorVaga.message);
             }
 
-            if (vagaAntes && vagaAntes.status_atual !== novoStatus) {
+            if (vagaAntes && statusAnterior !== novoStatus) {
                 logger.info('Status da vaga alterado', {
                     service: 'hardware-arduino',
                     context: {
                         vaga_id: 1,
                         sensor_id: ID_ALVO,
                         distancia_cm: distancia,
-                        status_anterior: vagaAntes.status_atual,
-                        status_novo: novoStatus
+                        status_anterior: statusParaTexto(statusAnterior),
+                        status_novo: statusParaTexto(novoStatus)
                     }
                 });
 
-                console.log(`📝 Gravando mudança no histórico: ${vagaAntes.status_atual} -> ${novoStatus}`);
+                console.log(`📝 Gravando mudança no histórico: ${statusParaTexto(statusAnterior)} -> ${statusParaTexto(novoStatus)}`);
                 
                 await supabase
                     .from('historico_vaga')

@@ -50,6 +50,12 @@ Utilizados pelo Aplicativo Mobile para exibir o status real do pátio.
 
 Retorna a lista de todas as vagas e se estão livres ou ocupadas.
 
+O campo `status_atual` é armazenado com códigos compactos:
+
+- `L`: livre
+- `O`: ocupado
+- `R`: reservado
+
 - **URL:** `/api/vagas/status`
     
 - **Método:** `GET`
@@ -59,7 +65,7 @@ Retorna a lista de todas as vagas e se estão livres ou ocupadas.
     [
       {
         "id_vaga": 1,
-        "status_atual": "LIVRE",
+        "status_atual": "L",
         "id_sensor": 1,
         "ultimo_sinal": "2023-10-27T14:30:00Z"
       }
@@ -79,9 +85,9 @@ Não é um endpoint HTTP, mas uma rotina de serviço interna.
     
 - **Lógica de Negócio:**
     
-    - Distância **<= 30cm**: Vaga marcada como `OCUPADA`.
+    - Distância **<= 30cm**: Vaga marcada como `O`.
         
-    - Distância **> 30cm**: Vaga marcada como `LIVRE`.
+    - Distância **> 30cm**: Vaga marcada como `L`.
         
 - **Ações Automáticas:**
     

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Clock3 } from 'lucide-react-native';
 
 // interface ParkingCardProps {
 //     livres: number;
@@ -14,11 +15,15 @@ export default function ParkingCard({
     ocupadas, 
     reservadas, 
     valorHora, 
-    onPressReservar 
+    onPressReservar,
+    actionLabel = 'Reservar Vaga',
+    actionVariant = 'reserve',
+    selectionSummary,
+    disabled = false,
 }) {
 
     const total = livres + ocupadas + reservadas;
-    const porcentagemDisponivel = Math.round((livres / total) * 100);
+    const porcentagemDisponivel = total > 0 ? Math.round((livres / total) * 100) : 0;
 
     return (
     <View style={styles.card}>
@@ -52,12 +57,28 @@ export default function ParkingCard({
         </View>
 
         <View style={styles.footer}>
-        <Text style={styles.footerText}>{porcentagemDisponivel}% disponível</Text>
-        <Text style={styles.priceText}>R$ {valorHora}/hora</Text>
+        <Text style={styles.footerText}>{selectionSummary || `${porcentagemDisponivel}% disponivel`}</Text>
+        <View style={styles.priceBadge}>
+            <Clock3 color="#42596a" size={16} />
+            <Text style={styles.priceText}>R$ {valorHora}/hora</Text>
+        </View>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={onPressReservar}>
-        <Text style={styles.buttonText}>Reservar Vaga</Text>
+        <TouchableOpacity
+            style={[
+                styles.button,
+                actionVariant === 'release' ? styles.releaseButton : null,
+                disabled || actionVariant === 'disabled' ? styles.disabledButton : null,
+            ]}
+            disabled={disabled || actionVariant === 'disabled'}
+            onPress={onPressReservar}>
+        <Text
+            style={[
+                styles.buttonText,
+                disabled || actionVariant === 'disabled' ? styles.disabledButtonText : null,
+            ]}>
+            {actionLabel}
+        </Text>
         </TouchableOpacity>
     </View>
     );
@@ -65,30 +86,32 @@ export default function ParkingCard({
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#1A1D21',
-        borderRadius: 24,
+        backgroundColor: '#f4f8fc',
+        borderRadius: 6,
         padding: 24,
         width: '100%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 10,
+        borderWidth: 1,
+        borderColor: '#caddea',
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 16,
+        elevation: 6,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 15,
     },
-    title: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+    title: { color: '#101b23', fontSize: 18, fontWeight: '800', flex: 1, paddingRight: 12 },
     badgeAberto: {
-        backgroundColor: '#1B3A29',
+        backgroundColor: '#e5f0e8',
         paddingHorizontal: 12,
         paddingVertical: 4,
         borderRadius: 8,
     },
-    badgeText: { color: '#2ECC71', fontSize: 12, fontWeight: 'bold' },
+    badgeText: { color: '#4d9a67', fontSize: 12, fontWeight: '800' },
     statsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -96,24 +119,46 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     statItem: { alignItems: 'center', flex: 1 },
-    divider: { width: 1, height: 30, backgroundColor: '#333' },
-    statNumberGreen: { color: '#2ECC71', fontSize: 24, fontWeight: 'bold' },
+    divider: { width: 1, height: 30, backgroundColor: '#cbdce8' },
+    statNumberGreen: { color: '#519b6d', fontSize: 24, fontWeight: '800' },
     statNumberRed: { color: '#E74C3C', fontSize: 24, fontWeight: 'bold' },
     statNumberOrange: { color: '#F39C12', fontSize: 24, fontWeight: 'bold' },
-    statNumberWhite: { color: '#FFFFFF', fontSize: 24, fontWeight: 'bold' },
-    statLabel: { color: '#888', fontSize: 12, marginTop: 4 },
+    statNumberWhite: { color: '#10212d', fontSize: 24, fontWeight: '800' },
+    statLabel: { color: '#43596b', fontSize: 12, marginTop: 4 },
     footer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 20,
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 15,
     },
-    footerText: { color: '#888', fontSize: 14 },
-    priceText: { color: '#5DADE2', fontSize: 14, fontWeight: 'bold' },
+    footerText: { flex: 1, color: '#43596b', fontSize: 14, fontWeight: '600' },
+    priceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#caddea',
+        backgroundColor: '#ffffff',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
+    priceText: { color: '#10212d', fontSize: 14, fontWeight: '800' },
     button: {
-        backgroundColor: '#5DADE2',
-        borderRadius: 12,
+        backgroundColor: '#519b6d',
+        borderRadius: 10,
         paddingVertical: 16,
         alignItems: 'center',
     },
-    buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+    releaseButton: {
+        backgroundColor: '#F39C12',
+    },
+    disabledButton: {
+        backgroundColor: '#d7e1e8',
+    },
+    buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+    disabledButtonText: {
+        color: '#6b7d89',
+    },
 });

@@ -5,7 +5,7 @@ import { Car } from 'lucide-react-native';
 export default function ParkingMap() {
   return (
     <View style={styles.webMapFallback}>
-      <Car color="#2ECC71" size={30} />
+      <Car color="#519b6d" size={30} />
       <Text style={styles.webMapTitle}>Mapa disponivel no app mobile</Text>
       <Text style={styles.webMapText}>Use esta tela web para validar login e cadastro.</Text>
     </View>
@@ -19,16 +19,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 24,
-    backgroundColor: '#1A1D21',
+    backgroundColor: '#f4f8fc',
   },
   webMapTitle: {
-    color: '#FFFFFF',
+    color: '#101b23',
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
   },
   webMapText: {
-    color: '#A9B3BC',
+    color: '#43596b',
     fontSize: 13,
     textAlign: 'center',
   },

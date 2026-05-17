@@ -4,6 +4,5 @@ const userController = require('../controllers/userController');
 
 router.post('/cadastrar', userController.cadastrarUsuario);
 router.post('/login', userController.loginUsuario);
-router.post('/google', userController.loginGoogle);
 
 module.exports = router;

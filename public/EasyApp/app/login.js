@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   SafeAreaView,
@@ -13,8 +14,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Eye, EyeOff, Globe2, LockKeyhole, Mail, UserRound } from 'lucide-react-native';
-import { loginWithEmail, registerWithEmail, signInWithGoogle } from '../services/authService';
+import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react-native';
+import { loginWithEmail, registerWithEmail } from '../services/authService';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -65,27 +66,14 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleAuth = async () => {
-    setLoading(true);
-    try {
-      const user = await signInWithGoogle();
-      if (user) {
-        goToApp();
-      }
-    } catch (error) {
-      Alert.alert('Login com Google', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
@@ -170,20 +158,6 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ou</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [styles.googleButton, pressed ? styles.googleButtonPressed : null]}
-              disabled={loading}
-              onPress={handleGoogleAuth}>
-              <Globe2 color="#0f1920" size={20} />
-              <Text style={styles.googleButtonText}>Entrar com Google</Text>
-            </Pressable>
-
             <View style={styles.footer}>
               <Text style={styles.footerText}>
                 {isRegister ? 'Ja tem uma conta? ' : 'Nao tem uma conta? '}
@@ -205,6 +179,7 @@ function Input({ icon, rightAction, style, ...props }) {
       {icon}
       <TextInput
         {...props}
+        onSubmitEditing={Keyboard.dismiss}
         style={styles.input}
         placeholderTextColor="#465f70"
         selectionColor="#519b6d"
@@ -226,16 +201,16 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 28,
-    paddingVertical: 42,
+    paddingTop: 28,
+    paddingBottom: 52,
   },
   card: {
     width: '100%',
-    minHeight: 670,
     alignSelf: 'center',
     borderRadius: 6,
     backgroundColor: '#f4f8fc',
     paddingHorizontal: 28,
-    paddingTop: 88,
+    paddingTop: 64,
     paddingBottom: 34,
     shadowColor: '#000000',
     shadowOpacity: 0.18,
@@ -312,46 +287,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginVertical: 17,
-  },
-  dividerLine: {
-    width: 60,
-    height: 1,
-    backgroundColor: '#cbdce8',
-  },
-  dividerText: {
-    color: '#344a5b',
-    fontSize: 12,
-  },
-  googleButton: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#cedfea',
-    backgroundColor: '#ffffff',
-  },
-  googleButtonPressed: {
-    backgroundColor: '#eef5f8',
-  },
-  googleButtonText: {
-    color: '#0f1920',
-    fontSize: 17,
-    fontWeight: '700',
-  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: 24,
   },
   footerText: {
     color: '#344a5b',

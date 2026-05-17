@@ -9,12 +9,18 @@ exports.cadastrarUsuario = async (req, res) => {
             return res.status(400).json({ erro: 'Preencha todos os campos obrigatórios.' });
         }
 
-        const { data: existente } = await supabase.from('usuario').select().eq('cpf', cpf).single();
+        const { data: existente } = await supabase.from('usuario').select().eq('cpf', cpf).maybeSingle();
         if (existente) return res.status(400).json({ erro: 'CPF já registrado.' });
 
-        const { data, error } = await supabase.from('usuario').insert([{
-            nome_completo, cpf, email, telefone, senha
-        }]).select().single();
+        const usuarioData = {
+            nome_completo,
+            cpf,
+            email,
+            telefone,
+            senha,
+        };
+
+        const { data, error } = await supabase.from('usuario').insert([usuarioData]).select().single();
 
         if (error) throw error;
         return res.status(201).json({
@@ -23,6 +29,7 @@ exports.cadastrarUsuario = async (req, res) => {
         });
 
     } catch (err) {
+        console.error('Erro ao cadastrar usuário:', err);
         res.status(500).json({ erro: 'Erro interno do servidor.' });
     }
 };
@@ -39,9 +46,11 @@ exports.loginUsuario = async (req, res) => {
             .from('usuario')
             .select()
             .eq('email', email)
-            .single();
+            .maybeSingle();
 
-        if (error || !senhaConfere(usuario, senha)) {
+        if (error) throw error;
+
+        if (!usuario || !senhaConfere(usuario, senha)) {
             return res.status(401).json({ erro: 'E-mail ou senha inválidos.' });
         }
 
@@ -50,50 +59,7 @@ exports.loginUsuario = async (req, res) => {
             usuario: removerSenha(usuario),
         });
     } catch (err) {
-        res.status(500).json({ erro: 'Erro interno do servidor.' });
-    }
-};
-
-exports.loginGoogle = async (req, res) => {
-    try {
-        const { email, nome_completo, google_id } = req.body;
-
-        if (!email || !nome_completo || !google_id) {
-            return res.status(400).json({ erro: 'Dados do Google incompletos.' });
-        }
-
-        const { data: existente } = await supabase
-            .from('usuario')
-            .select()
-            .eq('email', email)
-            .maybeSingle();
-
-        if (existente) {
-            return res.status(200).json({
-                mensagem: 'Login com Google realizado com sucesso!',
-                usuario: removerSenha(existente),
-            });
-        }
-
-        const { data, error } = await supabase
-            .from('usuario')
-            .insert([{
-                nome_completo,
-                email,
-                cpf: `google:${google_id}`,
-                telefone: null,
-                senha: null,
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return res.status(201).json({
-            mensagem: 'Usuário cadastrado com Google!',
-            usuario: removerSenha(data),
-        });
-    } catch (err) {
+        console.error('Erro ao fazer login:', err);
         res.status(500).json({ erro: 'Erro interno do servidor.' });
     }
 };
