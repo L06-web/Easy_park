@@ -352,6 +352,30 @@ async function obterAnomaliasPendentes() {
 }
 
 /**
+ * Recupera anomalias recentes, incluindo resolvidas e não resolvidas.
+ */
+async function obterAnomaliasRecentes(limite = 20) {
+    try {
+        const { data: anomalias, error } = await supabase
+        .from('evento_anomalia')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limite);
+
+        if (error) throw error;
+
+        return anomalias || [];
+
+    } catch (erro) {
+        logger.error('Erro ao recuperar anomalias recentes', {
+        service: 'analytics',
+        context: { erro: erro.message }
+        });
+        return [];
+    }
+}
+
+/**
  * Marca anomalia como resolvida
  */
 async function marcarResolvida(idAnomalia) {
@@ -387,5 +411,6 @@ module.exports = {
     detectarPicosAnormais,
     registrarAnomalias,
     obterAnomaliasPendentes,
+    obterAnomaliasRecentes,
     marcarResolvida
 };

@@ -94,7 +94,11 @@ exports.obterPadrao = async (req, res) => {
  */
 exports.obterAnomalias = async (req, res) => {
   try {
-    const anomalias = await anomalyDetector.obterAnomaliasPendentes();
+    const { status = 'pendentes', limite = 20 } = req.query;
+    const limiteNumerico = Number.parseInt(limite, 10) || 20;
+    const anomalias = status === 'todas'
+      ? await anomalyDetector.obterAnomaliasRecentes(limiteNumerico)
+      : await anomalyDetector.obterAnomaliasPendentes();
 
     logger.info('Anomalias consultadas via API', {
       service: 'backend-api',
@@ -303,22 +307,28 @@ exports.atualizarPadroes = async (req, res) => {
  */
 exports.obterDashboard = async (req, res) => {
   try {
+    const { periodo = '24h' } = req.query;
+    const periodoValido = periodo === '48h' ? '48h' : '24h';
+    const limiteIndicadores = periodoValido === '48h' ? 48 : 24;
+
     const [kpis, anomalias, indicadores, horariosPico] = await Promise.all([
       indicatorCalculator.calcularKPIsEmTempoReal(),
-      anomalyDetector.obterAnomaliasPendentes(),
-      indicatorCalculator.obterIndicadoresHistoricos('24h'),
-      patternDetector.identificarHorariosNice()
+      anomalyDetector.obterAnomaliasRecentes(20),
+      indicatorCalculator.obterIndicadoresHistoricos(periodoValido),
+      patternDetector.identificarHorariosPico()
     ]);
 
     const dashboard = {
       timestamp: new Date().toISOString(),
+      periodo: periodoValido,
       kpis,
       anomalias,
-      indicadores: indicadores.slice(-24), // Últimas 24 horas
+      indicadores: indicadores.slice(-limiteIndicadores),
       horarios_pico: horariosPico,
       resumo: {
         total_anomalias: anomalias.length,
         anomalias_criticas: anomalias.filter(a => a.severidade === 'critica').length,
+        anomalias_pendentes: anomalias.filter(a => !a.resolvido).length,
         saude_sistema: anomalias.length === 0 ? 'excelente' : 'precisa_atencao'
       }
     };

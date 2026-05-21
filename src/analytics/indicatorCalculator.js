@@ -35,12 +35,13 @@ async function calcularKPIsEmTempoReal(opcoes = { periodo: 'agora' }) {
 
     const { data: totalVagas, error: erroTotal } = await supabase
       .from('vaga')
-      .select('id_vaga');
+      .select('id_vaga, status_atual');
 
     if (erroTotal) throw erroTotal;
 
     const total = totalVagas.length;
-    const vagasLivres = Math.max(total - vagasOcupadas.length, 0);
+    const vagasLivres = totalVagas.filter(vaga => vaga.status_atual === 'L').length;
+    const vagasReservadas = totalVagas.filter(vaga => vaga.status_atual === 'R').length;
     const taxaOcupacao = total > 0 ? (vagasOcupadas.length / total) * 100 : 0;
 
     // 2. HISTÓRICO DO PERÍODO
@@ -92,6 +93,7 @@ async function calcularKPIsEmTempoReal(opcoes = { periodo: 'agora' }) {
         taxa_percentual: Math.round(taxaOcupacao * 100) / 100,
         vagas_ocupadas: vagasOcupadas.length,
         vagas_livres: vagasLivres,
+        vagas_reservadas: vagasReservadas,
         total_vagas: total
       },
       rotatividade: {
@@ -260,6 +262,8 @@ function calcularDataInicio(periodo) {
       return new Date(agora.getTime() - 60 * 60 * 1000);
     case '24h':
       return new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+    case '48h':
+      return new Date(agora.getTime() - 48 * 60 * 60 * 1000);
     case '7d':
       return new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000);
     case '30d':

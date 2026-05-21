@@ -1,389 +1,1024 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell
-} from 'recharts';
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import {
+  AlertTriangle,
+  Car,
+  CheckCircle2,
+  Clock3,
+  Gauge,
+  LockKeyhole,
+  LogOut,
+  Minus,
+  RefreshCcw,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { getApiBaseUrl, getUser, logout } from '../services/authService';
 
-/**
- * PROTÓTIPO - Dashboard Analytics
- * 
- * Componentes principais:
- * - KPICards: Indicadores principais
- * - OccupancyChart: Gráfico de ocupação
- * - AnomaliesAlert: Lista de anomalias
- * - TrendIndicator: Indicador de tendência
- * - HeatMap: Mapa de calor (simplificado)
- */
-
-// Cores para o dashboard
 const COLORS = {
-  primary: '#3B82F6',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  light: '#F3F4F6'
+  background: '#1c2428',
+  surface: '#f4f8fc',
+  surfaceMuted: '#e9f1f6',
+  card: '#ffffff',
+  border: '#caddea',
+  text: '#101b23',
+  muted: '#43596b',
+  green: '#519b6d',
+  greenDark: '#3f7f56',
+  red: '#E74C3C',
+  orange: '#F39C12',
+  yellow: '#d99a18',
 };
 
-/**
- * Card de KPI - Indicador Principal
- */
-function KPICard({ titulo, valor, unidade, tendencia, comparacao }) {
-  const ehSubindo = tendencia === 'subindo';
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
+function numberValue(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function formatPercent(value) {
+  return `${Math.round(numberValue(value))}%`;
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Sem data';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sem data';
+
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getTrendMeta(direction) {
+  if (direction === 'subindo') {
+    return {
+      label: 'Subindo',
+      Icon: TrendingUp,
+      color: COLORS.red,
+      helper: 'Maior pressão de ocupação',
+    };
+  }
+
+  if (direction === 'descendo') {
+    return {
+      label: 'Descendo',
+      Icon: TrendingDown,
+      color: COLORS.green,
+      helper: 'Ocupação em queda',
+    };
+  }
+
+  return {
+    label: 'Estável',
+    Icon: Minus,
+    color: COLORS.orange,
+    helper: 'Sem variação relevante',
+  };
+}
+
+function getSeverityStyle(severity) {
+  const stylesBySeverity = {
+    critica: { color: COLORS.red, backgroundColor: '#fdecea', label: 'Crítica' },
+    alta: { color: COLORS.orange, backgroundColor: '#fff2df', label: 'Alta' },
+    media: { color: COLORS.yellow, backgroundColor: '#fff8df', label: 'Média' },
+    baixa: { color: COLORS.green, backgroundColor: '#e5f0e8', label: 'Baixa' },
+  };
+
+  return stylesBySeverity[severity] ?? stylesBySeverity.baixa;
+}
+
+function KpiCard({ title, value, helper, icon: Icon, tone = COLORS.green, width }) {
   return (
-    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-gray-500 text-sm font-medium">{titulo}</p>
-          <div className="flex items-baseline gap-2 mt-2">
-            <h3 className="text-3xl font-bold text-gray-900">
-              {valor}
-              <span className="text-lg text-gray-500 font-normal ml-1">{unidade}</span>
-            </h3>
-          </div>
-          <p className="text-sm text-gray-600 mt-2">{comparacao}</p>
-        </div>
-
-        <div className="text-right">
-          <div className={`text-lg font-bold ${ehSubindo ? 'text-red-500' : 'text-green-500'}`}>
-            {ehSubindo ? '↑' : '↓'}
-          </div>
-        </div>
-      </div>
-    </div>
+    <View style={[styles.kpiCard, { width }]}>
+      <View style={styles.kpiHeader}>
+        <View style={[styles.iconBadge, { backgroundColor: `${tone}20` }]}>
+          <Icon color={tone} size={22} strokeWidth={2.4} />
+        </View>
+      </View>
+      <Text style={styles.kpiTitle}>{title}</Text>
+      <Text style={styles.kpiValue}>{value}</Text>
+      <Text style={styles.kpiHelper}>{helper}</Text>
+    </View>
   );
 }
 
-/**
- * Indicador de Tendência
- */
-function TrendIndicator({ direcao, desvio }) {
-  const cores = {
-    subindo: 'text-red-500 bg-red-50',
-    descendo: 'text-green-500 bg-green-50',
-    estavel: 'text-blue-500 bg-blue-50'
-  };
+function OccupancyChart({ data, width }) {
+  const chartWidth = Math.max(Math.min(width, 1040), 280);
+  const chartHeight = 280;
+  const leftPad = 44;
+  const rightPad = 18;
+  const topPad = 18;
+  const bottomPad = 44;
+  const innerWidth = chartWidth - leftPad - rightPad;
+  const innerHeight = chartHeight - topPad - bottomPad;
 
-  const labels = {
-    subindo: '📈 Ocupação Subindo',
-    descendo: '📉 Ocupação Diminuindo',
-    estavel: '→ Ocupação Estável'
-  };
+  const points = useMemo(() => {
+    return data.map((item, index) => {
+      const ratio = data.length > 1 ? index / (data.length - 1) : 0;
+      const value = Math.max(0, Math.min(100, numberValue(item.taxa_ocupacao)));
+      const x = leftPad + ratio * innerWidth;
+      const y = topPad + innerHeight - (value / 100) * innerHeight;
 
-  return (
-    <div className={`rounded-lg p-4 ${cores[direcao]}`}>
-      <p className="font-semibold">{labels[direcao]}</p>
-      <p className="text-sm mt-1">
-        Variabilidade: {desvio < 5 ? 'Baixa' : desvio < 15 ? 'Média' : 'Alta'}
-      </p>
-    </div>
-  );
-}
+      return {
+        x,
+        y,
+        value,
+        label: item.hora
+          ? new Date(item.hora).toLocaleTimeString('pt-BR', { hour: '2-digit' })
+          : new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit' }),
+      };
+    });
+  }, [data, innerHeight, innerWidth]);
 
-/**
- * Gráfico de Ocupação por Hora
- */
-function OccupancyChart({ dados }) {
-  if (!dados || dados.length === 0) {
+  if (!data.length) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-500 text-center">Carregando dados...</p>
-      </div>
+      <View style={styles.emptyChart}>
+        <Text style={styles.emptyTitle}>Sem histórico no período</Text>
+        <Text style={styles.emptyText}>A API ainda não retornou indicadores horários para montar o gráfico.</Text>
+      </View>
     );
   }
 
-  // Transformar dados para o gráfico
-  const dadosGrafico = dados.map((d) => ({
-    hora: d.hora || new Date(d.timestamp).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    ocupacao: d.taxa_ocupacao || 0,
-    vagas_livres: d.vagas_livres || 0
-  }));
+  const pointString = points.map(point => `${point.x},${point.y}`).join(' ');
+  const labelStep = Math.max(1, Math.ceil(points.length / 6));
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Ocupação por Hora</h3>
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={dadosGrafico}>
-          <defs>
-            <linearGradient id="colorOcupacao" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8} />
-              <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="hora" />
-          <YAxis />
-          <Tooltip formatter={(value) => `${value}%`} />
-          <Area
-            type="monotone"
-            dataKey="ocupacao"
-            stroke={COLORS.primary}
-            fillOpacity={1}
-            fill="url(#colorOcupacao)"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
+    <Svg width={chartWidth} height={chartHeight}>
+      {[0, 25, 50, 75, 100].map(value => {
+        const y = topPad + innerHeight - (value / 100) * innerHeight;
 
-/**
- * Lista de Anomalias
- */
-function AnomaliesAlert({ anomalias }) {
-  if (!anomalias || anomalias.length === 0) {
-    return (
-      <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-        <p className="text-green-700 font-semibold">✓ Nenhuma anomalia detectada</p>
-      </div>
-    );
-  }
-
-  const coresSeveridade = {
-    critica: 'bg-red-50 border-red-200 text-red-700',
-    alta: 'bg-orange-50 border-orange-200 text-orange-700',
-    media: 'bg-yellow-50 border-yellow-200 text-yellow-700',
-    baixa: 'bg-blue-50 border-blue-200 text-blue-700'
-  };
-
-  const iconsSeveridade = {
-    critica: '🔴',
-    alta: '🟠',
-    media: '🟡',
-    baixa: '🔵'
-  };
-
-  return (
-    <div className="space-y-2">
-      <h3 className="font-semibold text-red-700">Anomalias Detectadas</h3>
-      {anomalias.slice(0, 5).map((anomalia, idx) => (
-        <div
-          key={idx}
-          className={`border rounded-lg p-3 ${coresSeveridade[anomalia.severidade] || coresSeveridade.baixa}`}
-        >
-          <div className="flex items-start gap-2">
-            <span className="text-lg">{iconsSeveridade[anomalia.severidade]}</span>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">{anomalia.tipo}</p>
-              <p className="text-xs mt-1">{anomalia.descricao}</p>
-              {anomalia.id_vaga && (
-                <p className="text-xs mt-1 opacity-75">Vaga #{anomalia.id_vaga}</p>
-              )}
-            </div>
-          </div>
-        </div>
+        return (
+          <React.Fragment key={value}>
+            <Line x1={leftPad} y1={y} x2={chartWidth - rightPad} y2={y} stroke="#d7e4ec" strokeWidth="1" />
+            <SvgText x={8} y={y + 4} fill="#43596b" fontSize="11">
+              {value}%
+            </SvgText>
+          </React.Fragment>
+        );
+      })}
+      <Rect
+        x={leftPad}
+        y={topPad}
+        width={innerWidth}
+        height={innerHeight}
+        fill="none"
+        stroke="#caddea"
+        strokeWidth="1"
+        rx="6"
+      />
+      <Polyline points={pointString} fill="none" stroke={COLORS.green} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((point, index) => (
+        <React.Fragment key={`${point.x}-${index}`}>
+          {index % labelStep === 0 || index === points.length - 1 ? (
+            <SvgText x={point.x - 10} y={chartHeight - 14} fill="#43596b" fontSize="11">
+              {point.label}h
+            </SvgText>
+          ) : null}
+          <Circle cx={point.x} cy={point.y} r="4" fill="#ffffff" stroke={COLORS.greenDark} strokeWidth="2" />
+        </React.Fragment>
       ))}
-    </div>
+    </Svg>
   );
 }
 
-/**
- * Componente Principal - Dashboard
- */
+function AnomaliesList({ anomalies, onResolve }) {
+  if (!anomalies.length) {
+    return (
+      <View style={styles.emptyState}>
+        <CheckCircle2 color={COLORS.green} size={24} />
+        <View style={styles.emptyStateTextGroup}>
+          <Text style={styles.emptyTitle}>Nenhuma anomalia registrada</Text>
+          <Text style={styles.emptyText}>Quando a API detectar eventos fora do padrão, eles aparecerão aqui.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={styles.table}>
+        <View style={[styles.tableRow, styles.tableHeader]}>
+          <Text style={[styles.tableHeaderText, styles.colType]}>Tipo</Text>
+          <Text style={[styles.tableHeaderText, styles.colSpot]}>Vaga</Text>
+          <Text style={[styles.tableHeaderText, styles.colSeverity]}>Severidade</Text>
+          <Text style={[styles.tableHeaderText, styles.colDate]}>Data/hora</Text>
+          <Text style={[styles.tableHeaderText, styles.colStatus]}>Status</Text>
+        </View>
+        {anomalies.map(item => {
+          const severity = getSeverityStyle(item.severidade);
+          const isResolved = Boolean(item.resolvido);
+          const id = item.id_anomalia ?? item.id;
+
+          return (
+            <View key={`${id}-${item.timestamp}`} style={styles.tableRow}>
+              <Text style={[styles.tableCell, styles.colType]} numberOfLines={2}>
+                {String(item.tipo ?? 'anomalia').replaceAll('_', ' ')}
+              </Text>
+              <Text style={[styles.tableCell, styles.colSpot]}>{item.id_vaga ? `#${item.id_vaga}` : 'Geral'}</Text>
+              <View style={styles.colSeverity}>
+                <View style={[styles.severityPill, { backgroundColor: severity.backgroundColor }]}>
+                  <Text style={[styles.severityText, { color: severity.color }]}>{severity.label}</Text>
+                </View>
+              </View>
+              <Text style={[styles.tableCell, styles.colDate]}>{formatDateTime(item.timestamp)}</Text>
+              <View style={styles.colStatus}>
+                {isResolved ? (
+                  <View style={[styles.statusPill, styles.statusResolved]}>
+                    <Text style={styles.statusResolvedText}>Resolvido</Text>
+                  </View>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.resolveButton, pressed ? styles.buttonPressed : null]}
+                    onPress={() => onResolve(id)}
+                    disabled={!id}>
+                    <Text style={styles.resolveButtonText}>Resolver</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
+function PeakHours({ items }) {
+  if (!items.length) {
+    return (
+      <View style={styles.emptyState}>
+        <Clock3 color={COLORS.green} size={24} />
+        <View style={styles.emptyStateTextGroup}>
+          <Text style={styles.emptyTitle}>Sem horários de pico</Text>
+          <Text style={styles.emptyText}>Atualize os padrões para popular o top 5 de ocupação.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const maxValue = Math.max(...items.map(item => numberValue(item.ocupacao_media)), 1);
+
+  return (
+    <View style={styles.peakList}>
+      {items.slice(0, 5).map((item, index) => {
+        const value = numberValue(item.ocupacao_media);
+        const percent = Math.max(8, (value / maxValue) * 100);
+        const day = DAY_LABELS[item.dia] ?? 'Dia';
+
+        return (
+          <View key={`${item.dia}-${item.hora}-${index}`} style={styles.peakItem}>
+            <View style={styles.peakRank}>
+              <Text style={styles.peakRankText}>{index + 1}</Text>
+            </View>
+            <View style={styles.peakInfo}>
+              <View style={styles.peakTitleRow}>
+                <Text style={styles.peakTitle}>{day}, {String(item.hora).padStart(2, '0')}:00</Text>
+                <Text style={styles.peakConfidence}>{numberValue(item.confianca)}% confiança</Text>
+              </View>
+              <View style={styles.peakBarTrack}>
+                <View style={[styles.peakBar, { width: `${percent}%` }]} />
+              </View>
+              <Text style={styles.peakMeta}>{Math.round(value)} min de ocupação média</Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function Dashboard() {
-  const [dados, setDados] = useState(null);
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const [period, setPeriod] = useState('24h');
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState(null);
-  const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [checkedAuth, setCheckedAuth] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  const isDesktop = width >= 1040;
+  const isTablet = width >= 760;
+  const contentWidth = Math.min(width - (isDesktop ? 64 : 32), 1180);
+  const kpiWidth = isDesktop ? '31.8%' : isTablet ? '48.5%' : '100%';
+
+  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+    try {
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      const response = await fetch(`${getApiBaseUrl()}/api/analytics/dashboard?periodo=${period}`);
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.erro || payload.error || 'Nao foi possivel carregar o dashboard.');
+      }
+
+      setData(payload);
+      setLastUpdate(new Date());
+      setError(null);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [period]);
 
   useEffect(() => {
-    // Carregar dados do dashboard
-    const carregarDados = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/analytics/dashboard');
-
-        if (!response.ok) {
-          throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
-
-        const dados = await response.json();
-        setDados(dados);
-        setUltimaAtualizacao(new Date());
-        setErro(null);
-      } catch (erro) {
-        console.error('Erro ao carregar dados:', erro);
-        setErro(erro.message);
-      } finally {
-        setLoading(false);
+    const checkSession = async () => {
+      const user = await getUser();
+      if (!user) {
+        router.replace('/login');
+        return;
       }
+
+      setCheckedAuth(true);
     };
 
-    carregarDados();
+    checkSession();
+  }, [router]);
 
-    // Atualizar a cada 30 segundos
-    const intervalo = setInterval(carregarDados, 30000);
+  useEffect(() => {
+    if (!checkedAuth) return undefined;
 
-    return () => clearInterval(intervalo);
-  }, []);
+    loadDashboard();
+    const interval = setInterval(() => loadDashboard({ silent: true }), 30000);
 
-  if (loading && !dados) {
+    return () => clearInterval(interval);
+  }, [checkedAuth, loadDashboard]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
+
+  const handleResolve = async id => {
+    if (!id) return;
+
+    try {
+      setRefreshing(true);
+      const response = await fetch(`${getApiBaseUrl()}/api/analytics/anomalias/${id}/resolver`, {
+        method: 'POST',
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.erro || payload.error || 'Nao foi possivel resolver a anomalia.');
+      }
+
+      await loadDashboard({ silent: true });
+    } catch (resolveError) {
+      setError(resolveError.message);
+      setRefreshing(false);
+    }
+  };
+
+  const kpis = data?.kpis ?? {};
+  const occupancy = kpis.ocupacao ?? {};
+  const turnover = kpis.rotatividade ?? {};
+  const permanence = kpis.permanencia ?? {};
+  const trend = getTrendMeta(kpis.tendencia?.direcao);
+  const anomalies = data?.anomalias ?? [];
+  const pendingAnomalies = anomalies.filter(item => !item.resolvido).length;
+  const indicators = data?.indicadores ?? [];
+  const peakHours = data?.horarios_pico ?? [];
+
+  if (!checkedAuth || (loading && !data)) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando dashboard...</p>
-        </div>
-      </div>
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.centerState}>
+          <ActivityIndicator color="#ffffff" size="large" />
+          <Text style={styles.centerText}>Carregando painel...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
-
-  if (erro) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="text-center text-red-600">
-          <p className="text-lg font-semibold">Erro ao carregar dados</p>
-          <p className="text-sm mt-2">{erro}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const kpis = dados?.kpis || {};
-  const anomalias = dados?.anomalias || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">📊 Easy Park Dashboard</h1>
-            <p className="text-sm text-gray-500">
-              Atualizado em: {ultimaAtualizacao?.toLocaleTimeString('pt-BR')}
-            </p>
-          </div>
-        </div>
-      </header>
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={[styles.container, { width: contentWidth }]}>
+          <View style={styles.header}>
+            <View style={styles.headerTextGroup}>
+              <Text style={styles.headerEyebrow}>Easy Park Analytics</Text>
+              <Text style={styles.headerTitle}>Dashboard operacional</Text>
+              <Text style={styles.headerSubtitle}>Indicadores em tempo real consumidos da API de analytics.</Text>
+            </View>
 
-      {/* Conteúdo Principal */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* 1. Status Geral */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Status em Tempo Real</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard
-              titulo="Taxa de Ocupação"
-              valor={Math.round(kpis.ocupacao?.taxa_percentual || 0)}
-              unidade="%"
-              tendencia={kpis.tendencia?.direcao}
-              comparacao={`${kpis.ocupacao?.vagas_ocupadas || 0} de ${kpis.ocupacao?.total_vagas || 0} vagas`}
+            <View style={styles.headerActions}>
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.refreshButton, pressed ? styles.buttonPressed : null]}
+                onPress={() => loadDashboard({ silent: true })}
+                disabled={refreshing}>
+                {refreshing ? <ActivityIndicator color={COLORS.green} /> : <RefreshCcw color={COLORS.green} size={18} />}
+                <Text style={styles.refreshText}>Atualizar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sair"
+                style={({ pressed }) => [styles.logoutButton, pressed ? styles.buttonPressed : null]}
+                onPress={handleLogout}>
+                <LogOut color="#ffffff" size={20} strokeWidth={2.4} />
+              </Pressable>
+            </View>
+          </View>
+
+          {error ? (
+            <View style={styles.errorBanner}>
+              <AlertTriangle color={COLORS.red} size={20} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.kpiGrid}>
+            <KpiCard
+              width={kpiWidth}
+              title="Taxa de ocupação"
+              value={formatPercent(occupancy.taxa_percentual)}
+              helper={`${numberValue(occupancy.vagas_ocupadas)} de ${numberValue(occupancy.total_vagas)} vagas`}
+              icon={Gauge}
+              tone={COLORS.green}
             />
-            <KPICard
-              titulo="Vagas Livres"
-              valor={kpis.ocupacao?.vagas_livres || 0}
-              unidade="vagas"
-              tendencia="descendo"
-              comparacao="Disponível agora"
+            <KpiCard
+              width={kpiWidth}
+              title="Vagas livres"
+              value={numberValue(occupancy.vagas_livres)}
+              helper="Disponíveis agora"
+              icon={CheckCircle2}
+              tone={COLORS.green}
             />
-            <KPICard
-              titulo="Tempo Médio"
-              valor={Math.round(kpis.permanencia?.tempo_medio_minutos || 0)}
-              unidade="min"
-              tendencia="estavel"
-              comparacao="De permanência"
+            <KpiCard
+              width={kpiWidth}
+              title="Vagas ocupadas"
+              value={numberValue(occupancy.vagas_ocupadas)}
+              helper="Em uso no momento"
+              icon={Car}
+              tone={COLORS.red}
             />
-            <KPICard
-              titulo="Pico Máximo"
-              valor={Math.round(kpis.pico?.ocupacao_maxima_percentual || 0)}
-              unidade="%"
-              tendencia="subindo"
-              comparacao={`${kpis.pico?.vagas_simultaneas_max || 0} vagas`}
+            <KpiCard
+              width={kpiWidth}
+              title="Vagas reservadas"
+              value={numberValue(occupancy.vagas_reservadas)}
+              helper="Separadas para reserva"
+              icon={LockKeyhole}
+              tone={COLORS.orange}
             />
-          </div>
-        </div>
-
-        {/* 2. Tendência e Anomalias */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tendência Atual</h3>
-            <TrendIndicator
-              direcao={kpis.tendencia?.direcao}
-              desvio={kpis.tendencia?.desvio_padrao}
+            <KpiCard
+              width={kpiWidth}
+              title="Rotatividade"
+              value={numberValue(turnover.total_mudancas)}
+              helper={`${numberValue(turnover.media_por_hora)} mudanças/hora`}
+              icon={RefreshCcw}
+              tone={COLORS.orange}
             />
+            <KpiCard
+              width={kpiWidth}
+              title="Tempo médio"
+              value={`${Math.round(numberValue(permanence.tempo_medio_minutos))} min`}
+              helper="Permanência por ocupação"
+              icon={Clock3}
+              tone={COLORS.greenDark}
+            />
+            <KpiCard
+              width={kpiWidth}
+              title="Tendência"
+              value={trend.label}
+              helper={trend.helper}
+              icon={trend.Icon}
+              tone={trend.color}
+            />
+          </View>
 
-            <div className="mt-4 bg-white rounded-lg shadow p-4">
-              <h4 className="font-semibold text-sm mb-3">Saúde do Sistema</h4>
-              <div className="space-y-2 text-sm">
-                <p className="flex justify-between">
-                  <span>Rotatividade:</span>
-                  <strong>{kpis.rotatividade?.total_mudancas || 0}</strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Anomalias:</span>
-                  <strong className="text-red-600">{anomalias.length}</strong>
-                </p>
-                <p className="flex justify-between">
-                  <span>Status:</span>
-                  <strong className={anomalias.length === 0 ? 'text-green-600' : 'text-red-600'}>
-                    {anomalias.length === 0 ? '✓ Ótimo' : '⚠ Atenção'}
-                  </strong>
-                </p>
-              </div>
-            </div>
-          </div>
+          <View style={[styles.twoColumn, { flexDirection: isDesktop ? 'row' : 'column' }]}>
+            <View style={[styles.panel, styles.chartPanel, isDesktop ? styles.mainPanel : null]}>
+              <View style={styles.panelHeader}>
+                <View>
+                  <Text style={styles.panelTitle}>Gráfico de ocupação</Text>
+                  <Text style={styles.panelSubtitle}>Últimas {period === '24h' ? '24 horas' : '48 horas'}</Text>
+                </View>
+                <View style={styles.segmentedControl}>
+                  {['24h', '48h'].map(item => (
+                    <Pressable
+                      key={item}
+                      accessibilityRole="button"
+                      style={[styles.segmentButton, period === item ? styles.segmentButtonActive : null]}
+                      onPress={() => setPeriod(item)}>
+                      <Text style={[styles.segmentText, period === item ? styles.segmentTextActive : null]}>{item}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <OccupancyChart data={indicators} width={isDesktop ? contentWidth * 0.62 : contentWidth - 48} />
+            </View>
 
-          <div className="lg:col-span-2">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Anomalias Detectadas</h3>
-            <AnomaliesAlert anomalias={anomalias} />
-          </div>
-        </div>
+            <View style={[styles.panel, isDesktop ? styles.sidePanel : null]}>
+              <View style={styles.panelHeader}>
+                <View>
+                  <Text style={styles.panelTitle}>Resumo</Text>
+                  <Text style={styles.panelSubtitle}>Saúde da operação</Text>
+                </View>
+              </View>
+              <View style={styles.summaryList}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Anomalias pendentes</Text>
+                  <Text style={[styles.summaryValue, pendingAnomalies ? styles.summaryDanger : null]}>{pendingAnomalies}</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Anomalias recentes</Text>
+                  <Text style={styles.summaryValue}>{anomalies.length}</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Variabilidade</Text>
+                  <Text style={styles.summaryValue}>{kpis.tendencia?.variabilidade ?? 'baixa'}</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Atualizado</Text>
+                  <Text style={styles.summaryValue}>
+                    {lastUpdate ? lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
 
-        {/* 3. Gráfico de Ocupação */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Histórico</h2>
-          <OccupancyChart dados={dados?.indicadores || []} />
-        </div>
+          <View style={[styles.twoColumn, { flexDirection: isDesktop ? 'row' : 'column' }]}>
+            <View style={[styles.panel, isDesktop ? styles.mainPanel : null]}>
+              <View style={styles.panelHeader}>
+                <View>
+                  <Text style={styles.panelTitle}>Lista de anomalias</Text>
+                  <Text style={styles.panelSubtitle}>Tipo, vaga, severidade, data/hora e status</Text>
+                </View>
+              </View>
+              <AnomaliesList anomalies={anomalies} onResolve={handleResolve} />
+            </View>
 
-        {/* 4. Horários de Pico */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Horários de Pico</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Horário</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Dia</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Ocupação Média</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Confiança</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {(dados?.horarios_pico || []).map((h, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-sm text-gray-900">
-                      {String(h.hora).padStart(2, '0')}:00
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-700">
-                      {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'][h.dia]}
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: `${(h.ocupacao_media / 120) * 100}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm text-gray-700">{Math.round(h.ocupacao_media)} min</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-700">
-                      {h.confianca}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </main>
-    </div>
+            <View style={[styles.panel, isDesktop ? styles.sidePanel : null]}>
+              <View style={styles.panelHeader}>
+                <View>
+                  <Text style={styles.panelTitle}>Horários de pico</Text>
+                  <Text style={styles.panelSubtitle}>Top 5 horários mais ocupados</Text>
+                </View>
+              </View>
+              <PeakHours items={peakHours} />
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+  },
+  container: {
+    maxWidth: 1180,
+    gap: 18,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 14,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 18,
+    flexWrap: 'wrap',
+    paddingVertical: 10,
+  },
+  headerTextGroup: {
+    flex: 1,
+    minWidth: 280,
+  },
+  headerEyebrow: {
+    color: '#caddea',
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 32,
+    fontWeight: '800',
+    lineHeight: 39,
+    marginTop: 4,
+  },
+  headerSubtitle: {
+    color: '#caddea',
+    fontSize: 14,
+    marginTop: 5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  refreshButton: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 14,
+  },
+  refreshText: {
+    color: COLORS.green,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  logoutButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.green,
+  },
+  buttonPressed: {
+    opacity: 0.78,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#f0b8b1',
+    backgroundColor: '#fdecea',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: '#9f2d22',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  kpiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+  },
+  kpiCard: {
+    minHeight: 164,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    padding: 18,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  kpiHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  iconBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kpiTitle: {
+    color: COLORS.muted,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  kpiValue: {
+    color: COLORS.text,
+    fontSize: 30,
+    fontWeight: '800',
+    lineHeight: 36,
+    marginTop: 4,
+  },
+  kpiHelper: {
+    color: COLORS.muted,
+    fontSize: 13,
+    marginTop: 7,
+  },
+  twoColumn: {
+    gap: 18,
+  },
+  panel: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  chartPanel: {
+    overflow: 'hidden',
+  },
+  mainPanel: {
+    flex: 1.85,
+  },
+  sidePanel: {
+    flex: 1,
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+    marginBottom: 18,
+  },
+  panelTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  panelSubtitle: {
+    color: COLORS.muted,
+    fontSize: 13,
+    marginTop: 3,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#ffffff',
+    padding: 3,
+  },
+  segmentButton: {
+    minWidth: 54,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  segmentButtonActive: {
+    backgroundColor: COLORS.green,
+  },
+  segmentText: {
+    color: COLORS.muted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  segmentTextActive: {
+    color: '#ffffff',
+  },
+  emptyChart: {
+    minHeight: 230,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#ffffff',
+    padding: 22,
+  },
+  emptyState: {
+    minHeight: 104,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#ffffff',
+    padding: 16,
+  },
+  emptyStateTextGroup: {
+    flex: 1,
+  },
+  emptyTitle: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  emptyText: {
+    color: COLORS.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  summaryList: {
+    gap: 10,
+  },
+  summaryItem: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 14,
+  },
+  summaryLabel: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  summaryValue: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '800',
+    textTransform: 'capitalize',
+  },
+  summaryDanger: {
+    color: COLORS.red,
+  },
+  table: {
+    minWidth: 620,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+  },
+  tableRow: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  tableHeader: {
+    minHeight: 44,
+    borderTopWidth: 0,
+    backgroundColor: COLORS.surfaceMuted,
+  },
+  tableHeaderText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  tableCell: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  colType: {
+    flex: 1.25,
+  },
+  colSpot: {
+    width: 56,
+  },
+  colSeverity: {
+    width: 98,
+  },
+  colDate: {
+    width: 104,
+  },
+  colStatus: {
+    width: 104,
+    alignItems: 'flex-start',
+  },
+  severityPill: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  severityText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  statusPill: {
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  statusResolved: {
+    backgroundColor: '#e5f0e8',
+  },
+  statusResolvedText: {
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  resolveButton: {
+    borderRadius: 8,
+    backgroundColor: COLORS.green,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  resolveButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  peakList: {
+    gap: 14,
+  },
+  peakItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#ffffff',
+    padding: 12,
+  },
+  peakRank: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e5f0e8',
+  },
+  peakRankText: {
+    color: COLORS.green,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  peakInfo: {
+    flex: 1,
+  },
+  peakTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  peakTitle: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  peakConfidence: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  peakBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: COLORS.surfaceMuted,
+    marginTop: 10,
+  },
+  peakBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.green,
+  },
+  peakMeta: {
+    color: COLORS.muted,
+    fontSize: 12,
+    marginTop: 7,
+  },
+});

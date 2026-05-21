@@ -36,6 +36,10 @@ const API_URL = getApiUrl();
 
 const SESSION_KEY = 'easypark_user';
 
+export function getApiBaseUrl() {
+  return API_URL;
+}
+
 /**
  * Faz uma requisição à API backend
  */
@@ -114,6 +118,11 @@ function formatRequestError(error) {
  */
 export async function saveSession(user) {
   try {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      return;
+    }
+
     await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(user));
   } catch (error) {
     console.warn('Erro ao salvar sessão:', error);
@@ -125,6 +134,11 @@ export async function saveSession(user) {
  */
 export async function getUser() {
   try {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const user = window.localStorage.getItem(SESSION_KEY);
+      return user ? JSON.parse(user) : null;
+    }
+
     const user = await SecureStore.getItemAsync(SESSION_KEY);
     return user ? JSON.parse(user) : null;
   } catch (error) {
@@ -138,6 +152,11 @@ export async function getUser() {
  */
 export async function logout() {
   try {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.localStorage.removeItem(SESSION_KEY);
+      return;
+    }
+
     await SecureStore.deleteItemAsync(SESSION_KEY);
   } catch (error) {
     console.warn('Erro ao fazer logout:', error);

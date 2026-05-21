@@ -37,7 +37,7 @@ export default function LoginScreen() {
   };
 
   const goToApp = () => {
-    router.replace('/(tabs)');
+    router.replace(Platform.OS === 'web' ? '/dashboard' : '/(tabs)');
   };
 
   const handleEmailAuth = async () => {
@@ -206,6 +206,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
+    maxWidth: 430,
     alignSelf: 'center',
     borderRadius: 6,
     backgroundColor: '#f4f8fc',
