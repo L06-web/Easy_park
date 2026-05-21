@@ -1,6 +1,7 @@
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const supabase = require('../config/supabase');
+const analyticsService = require('./analyticsService');
 
 const logger = require('../../logger'); 
 
@@ -68,7 +69,7 @@ const initArduino = () => {
 
             const { data: vagaAntes } = await supabase
                 .from('vaga')
-                .select('status_atual')
+                .select('id_vaga, status_atual, id_sensor')
                 .eq('id_sensor', ID_ALVO)
                 .single();
 
@@ -101,11 +102,13 @@ const initArduino = () => {
                 console.error('❌ Erro ao atualizar vaga:', errorVaga.message);
             }
 
-            if (vagaAntes && statusAnterior !== novoStatus) {
+            if (!errorVaga && vagaAntes && statusAnterior !== novoStatus) {
+                const timestampMudanca = new Date().toISOString();
+
                 logger.info('Status da vaga alterado', {
                     service: 'hardware-arduino',
                     context: {
-                        vaga_id: 1,
+                        vaga_id: vagaAntes.id_vaga,
                         sensor_id: ID_ALVO,
                         distancia_cm: distancia,
                         status_anterior: statusParaTexto(statusAnterior),
@@ -118,10 +121,18 @@ const initArduino = () => {
                 await supabase
                     .from('historico_vaga')
                     .insert([{
-                        id_vaga: 1,
+                        id_vaga: vagaAntes.id_vaga,
                         status_registrado: statusBooleano,
-                        data_hora: new Date().toISOString()
+                        data_hora: timestampMudanca
                     }]);
+
+                await analyticsService.registrarEventoVaga({
+                    id_vaga: vagaAntes.id_vaga,
+                    status_anterior: statusAnterior,
+                    status_novo: novoStatus,
+                    timestamp: timestampMudanca,
+                    sensor_id: ID_ALVO
+                });
             }
 
         } catch (err) {

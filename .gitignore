@@ -5,3 +5,4 @@ logs
 projeto
 *.log
 .env
+EXEMPLO_SERVER_INTEGRACAO.js

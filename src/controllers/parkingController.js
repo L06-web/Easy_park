@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const logger = require('../../logger');
+const analyticsService = require('../services/analyticsService');
 
 const STATUS = {
     LIVRE: 'L',
@@ -93,6 +94,14 @@ exports.reservarVaga = async (req, res) => {
 
         if (erroReserva) throw erroReserva;
 
+        const analise = await analyticsService.registrarEventoVaga({
+            id_vaga: vagaReservada.id_vaga,
+            status_anterior: normalizarStatus(vagaAtual.status_atual),
+            status_novo: STATUS.RESERVADO,
+            timestamp: new Date().toISOString(),
+            sensor_id: vagaReservada.id_sensor
+        });
+
         logger.info('Vaga reservada com sucesso', {
             service: 'backend-api',
             context: {
@@ -104,6 +113,7 @@ exports.reservarVaga = async (req, res) => {
         return res.status(200).json({
             mensagem: 'Vaga reservada com sucesso!',
             vaga: vagaReservada,
+            analise,
         });
     } catch (err) {
         const mensagem = err.message || 'Erro ao reservar vaga.';
@@ -157,6 +167,14 @@ exports.liberarVaga = async (req, res) => {
 
         if (erroLiberacao) throw erroLiberacao;
 
+        const analise = await analyticsService.registrarEventoVaga({
+            id_vaga: vagaLiberada.id_vaga,
+            status_anterior: normalizarStatus(vagaAtual.status_atual),
+            status_novo: STATUS.LIVRE,
+            timestamp: new Date().toISOString(),
+            sensor_id: vagaLiberada.id_sensor
+        });
+
         logger.info('Reserva desfeita com sucesso', {
             service: 'backend-api',
             context: {
@@ -168,6 +186,7 @@ exports.liberarVaga = async (req, res) => {
         return res.status(200).json({
             mensagem: 'Reserva desfeita com sucesso!',
             vaga: vagaLiberada,
+            analise,
         });
     } catch (err) {
         const mensagem = err.message || 'Erro ao desfazer reserva.';

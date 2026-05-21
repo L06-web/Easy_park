@@ -4,6 +4,8 @@ const cors = require('cors');
 const userRoutes = require('./src/routes/userRoutes');
 const initArduino = require('./src/services/arduinoService');
 const parkingRoutes = require('./src/routes/parkingRoutes'); 
+const analyticsRoutes = require('./src/routes/analyticsRoutes');
+const analyticsService = require('./src/services/analyticsService');
 
 // 1. IMPORTANDO O LOGGER
 const logger = require('./logger');
@@ -33,9 +35,11 @@ app.use((req, res, next) => {
 // Rotas da API
 app.use('/api/usuarios', userRoutes);
 app.use('/api/vagas', parkingRoutes); 
+app.use('/api/analytics', analyticsRoutes);
 
 // Inicia a escuta do hardware
 initArduino();
+analyticsService.inicializarServico();
 
 // 3. MIDDLEWARE GLOBAL DE ERROS (Novo!)
 // Se alguma das suas rotas falhar e não tiver um bloco try/catch adequado,
@@ -65,4 +69,13 @@ app.listen(PORT, () => {
 
     // Mantemos o console.log com emoji para facilitar a leitura no terminal
     console.log(`🚀 EasyPark Rodando: http://localhost:${PORT}`);
+});
+
+process.on('SIGINT', () => {
+    logger.info('Encerrando servidor EasyPark', {
+        service: 'backend-api'
+    });
+
+    analyticsService.pararServico();
+    process.exit(0);
 });
