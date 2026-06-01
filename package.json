@@ -2,10 +2,10 @@
   "name": "easy_park",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "concurrently \"node server.js\" \"cd public/EasyApp && npx expo start -c\"",
+    "dev": "concurrently \"node server.js\"",
     "start": "node server.js"
   },
   "keywords": [],

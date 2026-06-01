@@ -198,7 +198,7 @@ app.listen(PORT, () => {
 });
 
 process.on('SIGINT', () => {
-    logger.info('Encerrando servidor EasyPark', { service: 'backend-api' });
+    logger.info('Encerrando servid  or EasyPark', { service: 'backend-api' });
     analyticsService.pararServico();
     process.exit(0);
 });
