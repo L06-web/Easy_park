@@ -1,3 +1,5 @@
+const logger = require('../../logger');
+
 function removerSenha(usuario) {
     if (!usuario) return null;
 
@@ -6,7 +8,19 @@ function removerSenha(usuario) {
 }
 
 function senhaConfere(usuario, senhaInformada) {
-    return Boolean(usuario && usuario.senha === senhaInformada);
+    const resultado = Boolean(usuario && usuario.senha === senhaInformada);
+    
+    if (!resultado) {
+        logger.debug('Falha na verificação de senha', {
+            service: 'backend-api',
+            context: {
+                servico: 'authService.senhaConfere',
+                usuario_existe: !!usuario
+            }
+        });
+    }
+    
+    return resultado;
 }
 
 module.exports = {

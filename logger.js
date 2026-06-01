@@ -49,11 +49,25 @@ const logger = winston.createLogger({
     format: winston.format.combine(
         // 2. Aplicando a função timezoned no formato do timestamp
         winston.format.timestamp({ format: timezoned }),
-        winston.format.json()
+        // Adicionar propriedades customizadas ao log
+        winston.format.printf(({ timestamp, level, message, service, context, ...rest }) => {
+            const logObj = {
+                timestamp,
+                level: level.toUpperCase(),
+                message,
+                service: service || 'backend-api',
+                context: context || {},
+                ...rest
+            };
+            return JSON.stringify(logObj);
+        })
     ),
     transports: [
         new winston.transports.File({ filename: 'logs/combined.log' }), // Mantém no arquivo local
         new SupabaseTransport() // Envia para a tabela system_logs no Supabase
+    ],
+    exceptionHandlers: [
+        new winston.transports.File({ filename: 'logs/exceptions.log' })
     ],
 });
 

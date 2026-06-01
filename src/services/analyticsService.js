@@ -65,7 +65,7 @@ function inicializarServico() {
 
     // 2. Agendar verificação de anomalias (a cada 5 minutos)
     const taskAnomalias = cron.schedule('*/5 * * * *', async () => {
-      logger.debug('Executando verificação de anomalias', {
+      logger.info('Executando verificação de anomalias', {
         service: 'analytics'
       });
 
