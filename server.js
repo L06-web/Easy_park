@@ -14,6 +14,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'EasyPark API' });
+});
+
+app.get('/api', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'EasyPark API' });
+});
+
 app.use((req, res, next) => {
     if (req.method !== 'OPTIONS') {
         logger.info(`Requisição recebida: ${req.method} ${req.url}`, {
@@ -178,8 +186,6 @@ app.post('/api/hardware/sensor', async (req, res) => {
     }
 });
 
-analyticsService.inicializarServico();
-
 app.use((err, req, res, next) => {
     logger.error('Erro interno não tratado no servidor', {
         service: 'backend-api',
@@ -189,16 +195,27 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    logger.info('Servidor EasyPark iniciado com sucesso', {
-        service: 'backend-api',
-        context: { porta: PORT, ambiente: process.env.NODE_ENV || 'desenvolvimento' }
-    });
-    console.log(`🚀 EasyPark Rodando: http://localhost:${PORT}`);
-});
 
-process.on('SIGINT', () => {
-    logger.info('Encerrando servid  or EasyPark', { service: 'backend-api' });
-    analyticsService.pararServico();
-    process.exit(0);
-});
+function startServer() {
+    analyticsService.inicializarServico();
+
+    app.listen(PORT, () => {
+        logger.info('Servidor EasyPark iniciado com sucesso', {
+            service: 'backend-api',
+            context: { porta: PORT, ambiente: process.env.NODE_ENV || 'desenvolvimento' }
+        });
+        console.log(`🚀 EasyPark Rodando: http://localhost:${PORT}`);
+    });
+}
+
+if (require.main === module) {
+    startServer();
+
+    process.on('SIGINT', () => {
+        logger.info('Encerrando servidor EasyPark', { service: 'backend-api' });
+        analyticsService.pararServico();
+        process.exit(0);
+    });
+}
+
+module.exports = app;
