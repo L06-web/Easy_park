@@ -2,10 +2,11 @@ const winston = require('winston');
 const Transport = require('winston-transport');
 const { createClient } = require('@supabase/supabase-js');
 
-// Configuração do Supabase (use suas chaves reais)
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseKey);
+const isVercel = Boolean(process.env.VERCEL);
+const supabase = hasSupabaseConfig ? createClient(supabaseUrl, supabaseKey) : null;
 
 // 1. Função para gerar a data no fuso horário de Brasília
 const timezoned = () => {
@@ -30,6 +31,11 @@ class SupabaseTransport extends Transport {
         setImmediate(() => { this.emit('logged', info); });
 
         try {
+            if (!supabase) {
+                callback();
+                return;
+            }
+
             await supabase.from('system_logs').insert([{
                 level: info.level.toUpperCase(),
                 service: info.service || 'backend-api',
@@ -42,6 +48,18 @@ class SupabaseTransport extends Transport {
 
         callback();
     }
+}
+
+const transports = [
+    new winston.transports.Console()
+];
+
+if (!isVercel) {
+    transports.push(new winston.transports.File({ filename: 'logs/combined.log' }));
+}
+
+if (hasSupabaseConfig) {
+    transports.push(new SupabaseTransport());
 }
 
 const logger = winston.createLogger({
@@ -62,13 +80,11 @@ const logger = winston.createLogger({
             return JSON.stringify(logObj);
         })
     ),
-    transports: [
-        new winston.transports.File({ filename: 'logs/combined.log' }), // Mantém no arquivo local
-        new SupabaseTransport() // Envia para a tabela system_logs no Supabase
-    ],
-    exceptionHandlers: [
-        new winston.transports.File({ filename: 'logs/exceptions.log' })
-    ],
+    transports,
 });
+
+if (!isVercel) {
+    logger.exceptions.handle(new winston.transports.File({ filename: 'logs/exceptions.log' }));
+}
 
 module.exports = logger;
