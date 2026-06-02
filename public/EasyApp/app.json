@@ -44,6 +44,7 @@
       "reactCompiler": true
     },
     "extra": {
+      "apiUrl": "https://easy-park-three.vercel.app",
       "router": {},
       "eas": {
         "projectId": "1baf678c-f139-49c7-8cb6-6e5dd9b59166"

@@ -107,7 +107,11 @@ export async function registerWithEmail({
 
 function formatRequestError(error) {
   if (error.message === 'Network request failed') {
-    return `Não foi possível conectar à API em ${API_URL}. Verifique se o backend está rodando e se o celular está na mesma rede.`;
+    const isRemoteApi = /^https:\/\//i.test(API_URL);
+
+    return isRemoteApi
+      ? `Não foi possível conectar à API em ${API_URL}. Verifique se a API publicada está respondendo.`
+      : `Não foi possível conectar à API em ${API_URL}. Verifique se o backend está rodando e se o celular está na mesma rede.`;
   }
 
   return error.message || 'Erro ao concluir a requisição';

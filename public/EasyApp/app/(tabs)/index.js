@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import ParkingCard from '../../components/ParkingCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ParkingMap from '../../components/ParkingMap';
-import { getUser, logout } from '../../services/authService';
+import { getApiBaseUrl, getUser, logout } from '../../services/authService';
 
 const STATUS = {
     LIVRE: 'L',
@@ -53,7 +53,7 @@ export default function TabOneScreen() {
     const [userName, setUserName] = useState('');
     const [selectedVaga, setSelectedVaga] = useState(null);
     const [vagaSelecionadaId, setVagaSelecionadaId] = useState(null);
-    const API_BASE_URL = 'http://10.0.0.126:3000/api/vagas';
+    const API_BASE_URL = `${getApiBaseUrl()}/api/vagas`;
 
     // Coordenada central do seu estacionamento (Exemplo)
     const initialRegion = {
