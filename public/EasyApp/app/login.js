@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Keyboard,
   Platform,
@@ -22,6 +21,7 @@ export default function LoginScreen() {
   const [mode, setMode] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [form, setForm] = useState({
     nome_completo: '',
     email: '',
@@ -33,6 +33,10 @@ export default function LoginScreen() {
   const isRegister = mode === 'register';
 
   const updateField = (field, value) => {
+    if (errorMessage) {
+      setErrorMessage('');
+    }
+
     setForm(current => ({ ...current, [field]: value }));
   };
 
@@ -42,15 +46,16 @@ export default function LoginScreen() {
 
   const handleEmailAuth = async () => {
     if (!form.email.trim() || !form.senha.trim()) {
-      Alert.alert('Campos obrigatorios', 'Informe e-mail e senha para continuar.');
+      setErrorMessage('Informe e-mail e senha para continuar.');
       return;
     }
 
     if (isRegister && (!form.nome_completo.trim() || !form.cpf.trim())) {
-      Alert.alert('Cadastro incompleto', 'Informe nome completo e CPF para criar sua conta.');
+      setErrorMessage('Informe nome completo e CPF para criar sua conta.');
       return;
     }
 
+    setErrorMessage('');
     setLoading(true);
     try {
       if (isRegister) {
@@ -60,7 +65,7 @@ export default function LoginScreen() {
       }
       goToApp();
     } catch (error) {
-      Alert.alert('Nao foi possivel entrar', error.message);
+      setErrorMessage(error.message || 'E-mail ou senha invalidos.');
     } finally {
       setLoading(false);
     }
@@ -144,6 +149,13 @@ export default function LoginScreen() {
               ) : null}
             </View>
 
+            {errorMessage ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorTitle}>Nao foi possivel entrar</Text>
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            ) : null}
+
             <Pressable
               style={({ pressed }) => [
                 styles.primaryButton,
@@ -162,7 +174,11 @@ export default function LoginScreen() {
               <Text style={styles.footerText}>
                 {isRegister ? 'Ja tem uma conta? ' : 'Nao tem uma conta? '}
               </Text>
-              <Pressable onPress={() => setMode(isRegister ? 'login' : 'register')}>
+              <Pressable
+                onPress={() => {
+                  setErrorMessage('');
+                  setMode(isRegister ? 'login' : 'register');
+                }}>
                 <Text style={styles.footerLink}>{isRegister ? 'Entrar' : 'Cadastre-se'}</Text>
               </Pressable>
             </View>
@@ -271,6 +287,26 @@ const styles = StyleSheet.create({
     color: '#4d9a67',
     fontSize: 12,
     fontWeight: '600',
+  },
+  errorBox: {
+    gap: 3,
+    borderWidth: 1,
+    borderColor: '#f0b8b1',
+    borderRadius: 10,
+    backgroundColor: '#fdecea',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 14,
+  },
+  errorTitle: {
+    color: '#9f2d22',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  errorText: {
+    color: '#9f2d22',
+    fontSize: 12,
+    lineHeight: 17,
   },
   primaryButton: {
     height: 47,
