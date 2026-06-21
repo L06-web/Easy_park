@@ -13,6 +13,7 @@ const patternDetector = require('../analytics/patternDetector');
 const anomalyDetector = require('../analytics/anomalyDetector');
 const indicatorCalculator = require('../analytics/indicatorCalculator');
 const logger = require('../../logger');
+const { BRASILIA_TIME_ZONE, agoraBrasiliaISO } = require('../utils/brasiliaDate');
 
 // Manter registro de subscriptions ativas
 let subscriptions = [];
@@ -59,7 +60,7 @@ function inicializarServico() {
           context: { erro: erro.message }
         });
       }
-    });
+    }, { timezone: BRASILIA_TIME_ZONE });
 
     scheduledTasks.push(taskPadroes);
 
@@ -78,7 +79,7 @@ function inicializarServico() {
           context: { erro: erro.message }
         });
       }
-    });
+    }, { timezone: BRASILIA_TIME_ZONE });
 
     scheduledTasks.push(taskAnomalias);
 
@@ -102,7 +103,7 @@ function inicializarServico() {
           context: { erro: erro.message }
         });
       }
-    });
+    }, { timezone: BRASILIA_TIME_ZONE });
 
     scheduledTasks.push(taskIndicadores);
 
@@ -179,7 +180,7 @@ async function processarEventoVaga(evento) {
  * bloquear a operação principal da vaga.
  */
 async function registrarEventoVaga(evento) {
-  const timestamp = evento.timestamp || new Date().toISOString();
+  const timestamp = evento.timestamp || agoraBrasiliaISO();
   const idVaga = Number(evento.id_vaga);
 
   try {

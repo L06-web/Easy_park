@@ -11,6 +11,14 @@
 const supabase = require('../config/supabase');
 const logger = require('../../logger');
 const ss = require('simple-statistics');
+const {
+  agoraBrasiliaISO,
+  toBrasiliaISOString,
+  getBrasiliaHour,
+  getBrasiliaDay,
+  adicionarDiasBrasilia,
+  subtrairDiasBrasilia
+} = require('../utils/brasiliaDate');
 
 const PATTERN_MIN_CONFIDENCE = 60; // % mínimo de dados válidos
 
@@ -24,15 +32,14 @@ const PATTERN_MIN_CONFIDENCE = 60; // % mínimo de dados válidos
  */
 async function calcularPadraoOcupacao(hora, diaSemana, diasHistorico = 30) {
   try {
-    const dataInicio = new Date();
-    dataInicio.setDate(dataInicio.getDate() - diasHistorico);
+    const dataInicio = subtrairDiasBrasilia(new Date(), diasHistorico);
 
     // Buscar histórico de vagas para horário/dia específicos
     const { data: historico, error: erroHistorico } = await supabase
       .from('vaga_historico')
       .select('*')
-      .gte('timestamp', dataInicio.toISOString())
-      .lte('timestamp', new Date().toISOString());
+      .gte('timestamp', toBrasiliaISOString(dataInicio))
+      .lte('timestamp', agoraBrasiliaISO());
 
     if (erroHistorico) throw erroHistorico;
     if (!historico || historico.length === 0) {
@@ -44,9 +51,8 @@ async function calcularPadraoOcupacao(hora, diaSemana, diasHistorico = 30) {
 
     // Filtrar eventos pelo horário e dia da semana
     const eventosHoraoDia = historico.filter(evento => {
-      const dataEvento = new Date(evento.timestamp);
-      const horaEvento = dataEvento.getHours();
-      const diaEvento = dataEvento.getDay();
+      const horaEvento = getBrasiliaHour(evento.timestamp);
+      const diaEvento = getBrasiliaDay(evento.timestamp);
 
       return horaEvento === hora && diaEvento === diaSemana;
     });
@@ -96,7 +102,7 @@ async function calcularPadraoOcupacao(hora, diaSemana, diasHistorico = 30) {
       amplitude_interquartil: Math.round((q3 - q1) * 100) / 100,
       amostras: durações.length,
       confianca: Math.round(confianca),
-      data_calculo: new Date().toISOString()
+      data_calculo: agoraBrasiliaISO()
     };
 
     logger.info('Padrão de ocupação calculado', {
@@ -309,13 +315,13 @@ async function identificarHorariosPico() {
 
 function contarOcorrenciasDiaSemana(dataInicio, dataFim, diaSemana) {
   let ocorrencias = 0;
-  const cursor = new Date(dataInicio);
+  let cursor = new Date(dataInicio);
 
   while (cursor <= dataFim) {
-    if (cursor.getDay() === diaSemana) {
+    if (getBrasiliaDay(cursor) === diaSemana) {
       ocorrencias++;
     }
-    cursor.setDate(cursor.getDate() + 1);
+    cursor = adicionarDiasBrasilia(cursor, 1);
   }
 
   return Math.max(ocorrencias, 1);

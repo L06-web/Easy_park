@@ -11,6 +11,13 @@
 const supabase = require('../config/supabase');
 const logger = require('../../logger');
 const patternDetector = require('./patternDetector');
+const {
+    agoraBrasiliaISO,
+    toBrasiliaISOString,
+    getBrasiliaHour,
+    getBrasiliaDay,
+    subtrairDiasBrasilia
+} = require('../utils/brasiliaDate');
 
 const ANOMALY_CONFIG = {
     Z_SCORE_CRITICAL: 4,
@@ -46,9 +53,8 @@ async function validarEvento(evento) {
         }
 
         // 2. Verifica se ocupação está dentro do padrão
-        const dataNow = new Date(evento.timestamp);
-        const hora = dataNow.getHours();
-        const diaSemana = dataNow.getDay();
+        const hora = getBrasiliaHour(evento.timestamp);
+        const diaSemana = getBrasiliaDay(evento.timestamp);
 
         const padraoEsperado = await patternDetector.obterPadraoEsperado(hora, diaSemana);
 
@@ -108,7 +114,7 @@ async function verificarSensorDefeituoso(idVaga, sensorId) {
         .select('*')
         .eq('id_vaga', idVaga)
         .eq('sensor_id', sensorId)
-        .gte('timestamp', tempoMinimo.toISOString())
+        .gte('timestamp', toBrasiliaISOString(tempoMinimo))
         .order('timestamp', { ascending: false });
 
         if (error) throw error;
@@ -148,8 +154,7 @@ async function verificarSensorDefeituoso(idVaga, sensorId) {
  */
 async function detectarInatividade() {
     try {
-        const dataLimite = new Date();
-        dataLimite.setDate(dataLimite.getDate() - ANOMALY_CONFIG.INACTIVITY_DAYS);
+        const dataLimite = subtrairDiasBrasilia(new Date(), ANOMALY_CONFIG.INACTIVITY_DAYS);
 
         const { data: vagasInativas, error } = await supabase
         .from('vaga')
@@ -226,7 +231,7 @@ async function detectarPicosAnormais() {
         const { data: historico, error: erroHistorico } = await supabase
         .from('vaga_historico')
         .select('*')
-        .gte('timestamp', umahora.toISOString());
+        .gte('timestamp', toBrasiliaISOString(umahora));
 
         if (erroHistorico) throw erroHistorico;
 
@@ -302,7 +307,7 @@ async function registrarAnomalias(anomalias) {
         .from('evento_anomalia')
         .insert(anomalias.map(a => ({
             ...a,
-            timestamp: new Date().toISOString(),
+            timestamp: agoraBrasiliaISO(),
             resolvido: false
         })));
 
@@ -384,7 +389,7 @@ async function marcarResolvida(idAnomalia) {
         .from('evento_anomalia')
         .update({
             resolvido: true,
-            data_resolucao: new Date().toISOString()
+            data_resolucao: agoraBrasiliaISO()
         })
         .eq('id_anomalia', idAnomalia);
 

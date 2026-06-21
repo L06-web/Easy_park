@@ -8,6 +8,7 @@ const patternDetector = require('../analytics/patternDetector');
 const anomalyDetector = require('../analytics/anomalyDetector');
 const indicatorCalculator = require('../analytics/indicatorCalculator');
 const logger = require('../../logger');
+const { agoraBrasiliaISO } = require('../utils/brasiliaDate');
 
 /**
  * GET /api/analytics/kpis
@@ -170,7 +171,7 @@ exports.obterTendencia = async (req, res) => {
       variabilidade: kpis.tendencia.variabilidade,
       desvio_padrao: kpis.tendencia.desvio_padrao,
       ocupacao_atual: kpis.ocupacao.taxa_percentual,
-      timestamp: new Date().toISOString()
+      timestamp: agoraBrasiliaISO()
     };
 
     logger.info('Tendência consultada via API', {
@@ -319,7 +320,7 @@ exports.obterDashboard = async (req, res) => {
     ]);
 
     const dashboard = {
-      timestamp: new Date().toISOString(),
+      timestamp: agoraBrasiliaISO(),
       periodo: periodoValido,
       kpis,
       anomalias,

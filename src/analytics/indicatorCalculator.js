@@ -13,6 +13,13 @@ const supabase = require('../config/supabase');
 const logger = require('../../logger');
 const ss = require('simple-statistics');
 const patternDetector = require('./patternDetector');
+const {
+  agoraBrasiliaISO,
+  toBrasiliaISOString,
+  getBrasiliaHour,
+  getBrasiliaDay,
+  inicioDaHoraAtualBrasilia
+} = require('../utils/brasiliaDate');
 
 /**
  * Calcula KPIs em tempo real
@@ -87,7 +94,7 @@ async function calcularKPIsEmTempoReal(opcoes = { periodo: 'agora' }) {
       : 0;
 
     const kpis = {
-      timestamp: new Date().toISOString(),
+      timestamp: agoraBrasiliaISO(),
       periodo,
       ocupacao: {
         taxa_percentual: Math.round(taxaOcupacao * 100) / 100,
@@ -149,14 +156,13 @@ async function calcularKPIsEmTempoReal(opcoes = { periodo: 'agora' }) {
  */
 async function calcularIndicadorHorario() {
   try {
-    const agora = new Date();
-    agora.setMinutes(0, 0, 0); // Começo da hora
+    const agora = inicioDaHoraAtualBrasilia(); // Comeco da hora em Brasilia
 
     const historico = await buscarHistoricoPeriodo(agora, new Date());
 
     // Agrupar por hora
-    const horaAtual = new Date().getHours();
-    const diaAtual = new Date().getDay();
+    const horaAtual = getBrasiliaHour();
+    const diaAtual = getBrasiliaDay();
 
     // Calcular estatísticas da hora
     const duracoes = historico
@@ -178,7 +184,7 @@ async function calcularIndicadorHorario() {
     );
 
     const indicador = {
-      hora: agora.toISOString(),
+      hora: toBrasiliaISOString(agora),
       dia_semana: diaAtual,
       taxa_ocupacao: vagasTotal.length > 0
         ? Math.round((ocupacoesPico / vagasTotal.length) * 100)
@@ -190,7 +196,7 @@ async function calcularIndicadorHorario() {
         ? Math.round(ss.mean(duracoes))
         : 0,
       pico_ocupacao: ocupacoesPico,
-      timestamp: new Date().toISOString()
+      timestamp: agoraBrasiliaISO()
     };
 
     // Salvar no banco
@@ -230,7 +236,7 @@ async function obterIndicadoresHistoricos(periodo = '24h') {
     const { data: indicadores, error } = await supabase
       .from('indicador_horario')
       .select('*')
-      .gte('timestamp', dataInicio.toISOString())
+      .gte('timestamp', toBrasiliaISOString(dataInicio))
       .order('timestamp', { ascending: true });
 
     if (error) throw error;
@@ -277,8 +283,8 @@ async function buscarHistoricoPeriodo(dataInicio, dataFim) {
   const { data, error } = await supabase
     .from('vaga_historico')
     .select('*')
-    .gte('timestamp', dataInicio.toISOString())
-    .lte('timestamp', dataFim.toISOString());
+    .gte('timestamp', toBrasiliaISOString(dataInicio))
+    .lte('timestamp', toBrasiliaISOString(dataFim));
 
   if (!error) {
     return data || [];
@@ -298,8 +304,8 @@ async function buscarHistoricoPeriodo(dataInicio, dataFim) {
   const { data: legado, error: erroLegado } = await supabase
     .from('historico_vaga')
     .select('*')
-    .gte('data_hora', dataInicio.toISOString())
-    .lte('data_hora', dataFim.toISOString());
+    .gte('data_hora', toBrasiliaISOString(dataInicio))
+    .lte('data_hora', toBrasiliaISOString(dataFim));
 
   if (erroLegado) throw erroLegado;
 

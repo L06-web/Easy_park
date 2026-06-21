@@ -9,6 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.easyapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "supportsTablet": true
     },
     "android": {
@@ -32,8 +36,12 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
           "backgroundColor": "#1c2428",
           "dark": {
+            "image": "./assets/images/splash-icon.png",
             "backgroundColor": "#1c2428"
           }
         }

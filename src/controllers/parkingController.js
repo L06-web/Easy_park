@@ -1,6 +1,7 @@
 const supabase = require('../config/supabase');
 const logger = require('../../logger');
 const analyticsService = require('../services/analyticsService');
+const { agoraBrasiliaISO } = require('../utils/brasiliaDate');
 
 const STATUS = {
     LIVRE: 'L',
@@ -98,7 +99,7 @@ exports.reservarVaga = async (req, res) => {
             id_vaga: vagaReservada.id_vaga,
             status_anterior: normalizarStatus(vagaAtual.status_atual),
             status_novo: STATUS.RESERVADO,
-            timestamp: new Date().toISOString(),
+            timestamp: agoraBrasiliaISO(),
             sensor_id: vagaReservada.id_sensor
         });
 
@@ -171,7 +172,7 @@ exports.liberarVaga = async (req, res) => {
             id_vaga: vagaLiberada.id_vaga,
             status_anterior: normalizarStatus(vagaAtual.status_atual),
             status_novo: STATUS.LIVRE,
-            timestamp: new Date().toISOString(),
+            timestamp: agoraBrasiliaISO(),
             sensor_id: vagaLiberada.id_sensor
         });
 

@@ -6,6 +6,7 @@ const parkingRoutes = require('./src/routes/parkingRoutes');
 const analyticsRoutes = require('./src/routes/analyticsRoutes');
 const analyticsService = require('./src/services/analyticsService');
 const supabase = require('./src/config/supabase');
+const { agoraBrasiliaISO } = require('./src/utils/brasiliaDate');
 
 const logger = require('./logger');
 
@@ -55,7 +56,7 @@ app.post('/api/hardware/sensor', async (req, res) => {
     const statusBooleano = estaOcupada;
 
     try {
-        const agora = new Date().toISOString();
+        const agora = agoraBrasiliaISO();
 
         logger.info('Dados recebidos de sensor via HTTP', {
             service: 'hardware-api',

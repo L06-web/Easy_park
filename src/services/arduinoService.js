@@ -1,6 +1,7 @@
 const supabase = require('../config/supabase');
 const analyticsService = require('./analyticsService');
 const logger = require('../../logger');
+const { agoraBrasiliaISO } = require('../utils/brasiliaDate');
 
 const STATUS = {
     LIVRE: 'L',
@@ -49,7 +50,7 @@ const procesarDadosSensor = async (idSensor, distancia) => {
 
         await supabase
             .from('sensor')
-            .update({ ultimo_sinal: new Date().toISOString() })
+            .update({ ultimo_sinal: agoraBrasiliaISO() })
             .eq('id_sensor', idSensor);
 
         const statusAnterior = normalizarStatus(vagaAntes.status_atual);
@@ -70,7 +71,7 @@ const procesarDadosSensor = async (idSensor, distancia) => {
         }
 
         if (statusAnterior !== novoStatus) {
-            const timestampMudanca = new Date().toISOString();
+            const timestampMudanca = agoraBrasiliaISO();
             console.log(`✅ Vaga ${vagaAntes.id_vaga}: ${statusParaTexto(statusAnterior)} → ${statusParaTexto(novoStatus)}`);
 
             await supabase
