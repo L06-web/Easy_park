@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -35,6 +35,8 @@ const COLORS = {
   orange: '#F39C12',
   yellow: '#d99a18',
 };
+
+const DASHBOARD_REFRESH_INTERVAL_MS = 3000;
 
 function numberValue(value, fallback = 0) {
   const numeric = Number(value);
@@ -150,9 +152,9 @@ function AnomaliesList({ anomalies, onResolve }) {
 export default function Dashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const requestInFlight = useRef(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -163,10 +165,14 @@ export default function Dashboard() {
   const kpiWidth = isDesktop ? '31.8%' : isTablet ? '48.5%' : '100%';
 
   const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+    if (requestInFlight.current) {
+      return;
+    }
+
+    requestInFlight.current = true;
+
     try {
-      if (silent) {
-        setRefreshing(true);
-      } else {
+      if (!silent) {
         setLoading(true);
       }
 
@@ -184,7 +190,7 @@ export default function Dashboard() {
       setError(requestError.message);
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      requestInFlight.current = false;
     }
   }, []);
 
@@ -206,7 +212,7 @@ export default function Dashboard() {
     if (!checkedAuth) return undefined;
 
     loadDashboard();
-    const interval = setInterval(() => loadDashboard({ silent: true }), 30000);
+    const interval = setInterval(() => loadDashboard({ silent: true }), DASHBOARD_REFRESH_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [checkedAuth, loadDashboard]);
@@ -220,7 +226,6 @@ export default function Dashboard() {
     if (!id) return;
 
     try {
-      setRefreshing(true);
       const response = await fetch(`${getApiBaseUrl()}/api/analytics/anomalias/${id}/resolver`, {
         method: 'POST',
       });
@@ -233,7 +238,6 @@ export default function Dashboard() {
       await loadDashboard({ silent: true });
     } catch (resolveError) {
       setError(resolveError.message);
-      setRefreshing(false);
     }
   };
 
@@ -266,14 +270,6 @@ export default function Dashboard() {
             </View>
 
             <View style={styles.headerActions}>
-              <Pressable
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.refreshButton, pressed ? styles.buttonPressed : null]}
-                onPress={() => loadDashboard({ silent: true })}
-                disabled={refreshing}>
-                {refreshing ? <ActivityIndicator color={COLORS.green} /> : <RefreshCcw color={COLORS.green} size={18} />}
-                <Text style={styles.refreshText}>Atualizar</Text>
-              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Sair"
