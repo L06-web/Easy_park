@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react-native';
-import { loginWithEmail, registerWithEmail } from '../services/authService';
+import { loginWithEmail, registerWithEmail, resetPasswordWithCpf } from '../services/authService';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -22,19 +22,25 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [form, setForm] = useState({
     nome_completo: '',
     email: '',
     senha: '',
+    confirmarSenha: '',
     cpf: '',
     telefone: '',
   });
 
   const isRegister = mode === 'register';
+  const isRecover = mode === 'recover';
 
   const updateField = (field, value) => {
     if (errorMessage) {
       setErrorMessage('');
+    }
+    if (successMessage) {
+      setSuccessMessage('');
     }
 
     setForm(current => ({ ...current, [field]: value }));
@@ -45,6 +51,33 @@ export default function LoginScreen() {
   };
 
   const handleEmailAuth = async () => {
+    if (isRecover) {
+      if (!form.email.trim() || !form.cpf.trim() || !form.senha.trim() || !form.confirmarSenha.trim()) {
+        setErrorMessage('Informe e-mail, CPF, nova senha e confirmação.');
+        return;
+      }
+
+      if (form.senha !== form.confirmarSenha) {
+        setErrorMessage('A nova senha e a confirmação precisam ser iguais.');
+        return;
+      }
+
+      setErrorMessage('');
+      setSuccessMessage('');
+      setLoading(true);
+      try {
+        await resetPasswordWithCpf(form.email.trim(), form.cpf.trim(), form.senha);
+        setSuccessMessage('Senha atualizada com sucesso. Entre com sua nova senha.');
+        setMode('login');
+        setForm(current => ({ ...current, senha: '', confirmarSenha: '' }));
+      } catch (error) {
+        setErrorMessage(error.message || 'Nao foi possivel atualizar a senha.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!form.email.trim() || !form.senha.trim()) {
       setErrorMessage('Informe e-mail e senha para continuar.');
       return;
@@ -86,9 +119,15 @@ export default function LoginScreen() {
               <LockKeyhole color="#ffffff" size={34} strokeWidth={2.4} />
             </View>
 
-            <Text style={styles.title}>{isRegister ? 'Criar conta' : 'Bem-vindo!'}</Text>
+            <Text style={styles.title}>
+              {isRegister ? 'Criar conta' : isRecover ? 'Recuperar senha' : 'Bem-vindo!'}
+            </Text>
             <Text style={styles.subtitle}>
-              {isRegister ? 'Cadastre-se para continuar' : 'Faca login para continuar'}
+              {isRegister
+                ? 'Cadastre-se para continuar'
+                : isRecover
+                  ? 'Informe e-mail, CPF e uma nova senha'
+                  : 'Faca login para continuar'}
             </Text>
 
             <View style={styles.form}>
@@ -111,7 +150,7 @@ export default function LoginScreen() {
                 autoCapitalize="none"
               />
 
-              {isRegister ? (
+              {isRegister || isRecover ? (
                 <Input
                   icon={<UserRound color="#42596a" size={18} />}
                   placeholder="CPF"
@@ -123,7 +162,7 @@ export default function LoginScreen() {
 
               <Input
                 icon={<LockKeyhole color="#42596a" size={18} />}
-                placeholder="Senha"
+                placeholder={isRecover ? 'Nova senha' : 'Senha'}
                 value={form.senha}
                 onChangeText={value => updateField('senha', value)}
                 secureTextEntry={!showPassword}
@@ -142,16 +181,41 @@ export default function LoginScreen() {
                 }
               />
 
-              {!isRegister ? (
-                <Pressable style={styles.forgotButton}>
+              {isRecover ? (
+                <Input
+                  icon={<LockKeyhole color="#42596a" size={18} />}
+                  placeholder="Confirmar nova senha"
+                  value={form.confirmarSenha}
+                  onChangeText={value => updateField('confirmarSenha', value)}
+                  secureTextEntry={!showPassword}
+                />
+              ) : null}
+
+              {!isRegister && !isRecover ? (
+                <Pressable
+                  style={styles.forgotButton}
+                  onPress={() => {
+                    setErrorMessage('');
+                    setSuccessMessage('');
+                    setMode('recover');
+                  }}>
                   <Text style={styles.forgotText}>Esqueceu a senha?</Text>
                 </Pressable>
               ) : null}
             </View>
 
+            {successMessage ? (
+              <View style={styles.successBox}>
+                <Text style={styles.successTitle}>Tudo certo</Text>
+                <Text style={styles.successText}>{successMessage}</Text>
+              </View>
+            ) : null}
+
             {errorMessage ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorTitle}>Nao foi possivel entrar</Text>
+                <Text style={styles.errorTitle}>
+                  {isRecover ? 'Nao foi possivel recuperar' : 'Nao foi possivel entrar'}
+                </Text>
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             ) : null}
@@ -166,20 +230,25 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
-                <Text style={styles.primaryButtonText}>{isRegister ? 'Cadastrar' : 'Entrar'}</Text>
+                <Text style={styles.primaryButtonText}>
+                  {isRegister ? 'Cadastrar' : isRecover ? 'Alterar senha' : 'Entrar'}
+                </Text>
               )}
             </Pressable>
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>
-                {isRegister ? 'Ja tem uma conta? ' : 'Nao tem uma conta? '}
+                {isRecover ? 'Lembrou sua senha? ' : isRegister ? 'Ja tem uma conta? ' : 'Nao tem uma conta? '}
               </Text>
               <Pressable
                 onPress={() => {
                   setErrorMessage('');
-                  setMode(isRegister ? 'login' : 'register');
+                  setSuccessMessage('');
+                  setMode(isRegister || isRecover ? 'login' : 'register');
                 }}>
-                <Text style={styles.footerLink}>{isRegister ? 'Entrar' : 'Cadastre-se'}</Text>
+                <Text style={styles.footerLink}>
+                  {isRegister || isRecover ? 'Entrar' : 'Cadastre-se'}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -305,6 +374,26 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#9f2d22',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  successBox: {
+    gap: 3,
+    borderWidth: 1,
+    borderColor: '#a7d9b7',
+    borderRadius: 10,
+    backgroundColor: '#e9f7ee',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 14,
+  },
+  successTitle: {
+    color: '#2f7a47',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  successText: {
+    color: '#2f7a47',
     fontSize: 12,
     lineHeight: 17,
   },

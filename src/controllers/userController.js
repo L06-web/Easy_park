@@ -134,3 +134,77 @@ exports.loginUsuario = async (req, res) => {
         res.status(500).json({ erro: 'Erro interno do servidor.' });
     }
 };
+
+exports.recuperarSenha = async (req, res) => {
+    try {
+        const { email, cpf, novaSenha } = req.body;
+
+        if (!email || !cpf || !novaSenha) {
+            logger.warn('Tentativa de recuperação de senha com dados incompletos', {
+                service: 'backend-api',
+                context: {
+                    controller: 'userController.recuperarSenha',
+                    campos_faltantes: {
+                        email: !email,
+                        cpf: !cpf,
+                        novaSenha: !novaSenha
+                    }
+                }
+            });
+            return res.status(400).json({ erro: 'Informe e-mail, CPF e nova senha.' });
+        }
+
+        const emailNormalizado = String(email).trim().toLowerCase();
+        const cpfNormalizado = String(cpf).replace(/\D/g, '');
+
+        const { data: usuario, error } = await supabase
+            .from('usuario')
+            .select()
+            .eq('email', emailNormalizado)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        const cpfUsuario = usuario?.cpf ? String(usuario.cpf).replace(/\D/g, '') : '';
+        if (!usuario || cpfUsuario !== cpfNormalizado) {
+            logger.warn('Tentativa de recuperação de senha com dados inválidos', {
+                service: 'backend-api',
+                context: {
+                    controller: 'userController.recuperarSenha',
+                    email: emailNormalizado,
+                    usuario_encontrado: !!usuario
+                }
+            });
+            return res.status(404).json({ erro: 'E-mail ou CPF não encontrados.' });
+        }
+
+        const { error: updateError } = await supabase
+            .from('usuario')
+            .update({ senha: novaSenha })
+            .eq('email', emailNormalizado)
+            .eq('cpf', usuario.cpf);
+
+        if (updateError) throw updateError;
+
+        logger.info('Senha recuperada com sucesso', {
+            service: 'backend-api',
+            context: {
+                controller: 'userController.recuperarSenha',
+                email: emailNormalizado
+            }
+        });
+
+        return res.status(200).json({ mensagem: 'Senha atualizada com sucesso.' });
+    } catch (err) {
+        logger.error('Erro ao recuperar senha', {
+            service: 'backend-api',
+            context: {
+                controller: 'userController.recuperarSenha',
+                erro: err.message,
+                stack: err.stack
+            }
+        });
+        console.error('Erro ao recuperar senha:', err);
+        res.status(500).json({ erro: 'Erro interno do servidor.' });
+    }
+};

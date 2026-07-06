@@ -10,3 +10,5 @@ server_bacckup.js
 arduino
 .idea
 builds
+outputs
+work

@@ -105,6 +105,21 @@ export async function registerWithEmail({
   }
 }
 
+/**
+ * Redefinir senha validando email e CPF na API
+ */
+export async function resetPasswordWithCpf(email, cpf, novaSenha) {
+  try {
+    return await apiRequest('/api/usuarios/recuperar-senha', {
+      email,
+      cpf,
+      novaSenha,
+    });
+  } catch (error) {
+    throw new Error(formatRequestError(error));
+  }
+}
+
 function formatRequestError(error) {
   if (error.message === 'Network request failed') {
     const isRemoteApi = /^https:\/\//i.test(API_URL);
