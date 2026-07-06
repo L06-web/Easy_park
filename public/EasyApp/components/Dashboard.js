@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,19 +9,14 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import {
   AlertTriangle,
   Car,
   CheckCircle2,
-  Clock3,
   Gauge,
   LockKeyhole,
   LogOut,
-  Minus,
   RefreshCcw,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { getApiBaseUrl, getUser, logout } from '../services/authService';
@@ -40,8 +35,6 @@ const COLORS = {
   orange: '#F39C12',
   yellow: '#d99a18',
 };
-
-const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
 function numberValue(value, fallback = 0) {
   const numeric = Number(value);
@@ -63,33 +56,6 @@ function formatDateTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function getTrendMeta(direction) {
-  if (direction === 'subindo') {
-    return {
-      label: 'Subindo',
-      Icon: TrendingUp,
-      color: COLORS.red,
-      helper: 'Maior pressão de ocupação',
-    };
-  }
-
-  if (direction === 'descendo') {
-    return {
-      label: 'Descendo',
-      Icon: TrendingDown,
-      color: COLORS.green,
-      helper: 'Ocupação em queda',
-    };
-  }
-
-  return {
-    label: 'Estável',
-    Icon: Minus,
-    color: COLORS.orange,
-    helper: 'Sem variação relevante',
-  };
 }
 
 function getSeverityStyle(severity) {
@@ -115,85 +81,6 @@ function KpiCard({ title, value, helper, icon: Icon, tone = COLORS.green, width 
       <Text style={styles.kpiValue}>{value}</Text>
       <Text style={styles.kpiHelper}>{helper}</Text>
     </View>
-  );
-}
-
-function OccupancyChart({ data, width }) {
-  const chartWidth = Math.max(Math.min(width, 1040), 280);
-  const chartHeight = 280;
-  const leftPad = 44;
-  const rightPad = 18;
-  const topPad = 18;
-  const bottomPad = 44;
-  const innerWidth = chartWidth - leftPad - rightPad;
-  const innerHeight = chartHeight - topPad - bottomPad;
-
-  const points = useMemo(() => {
-    return data.map((item, index) => {
-      const ratio = data.length > 1 ? index / (data.length - 1) : 0;
-      const value = Math.max(0, Math.min(100, numberValue(item.taxa_ocupacao)));
-      const x = leftPad + ratio * innerWidth;
-      const y = topPad + innerHeight - (value / 100) * innerHeight;
-
-      return {
-        x,
-        y,
-        value,
-        label: item.hora
-          ? new Date(item.hora).toLocaleTimeString('pt-BR', { hour: '2-digit' })
-          : new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit' }),
-      };
-    });
-  }, [data, innerHeight, innerWidth]);
-
-  if (!data.length) {
-    return (
-      <View style={styles.emptyChart}>
-        <Text style={styles.emptyTitle}>Sem histórico no período</Text>
-        <Text style={styles.emptyText}>A API ainda não retornou indicadores horários para montar o gráfico.</Text>
-      </View>
-    );
-  }
-
-  const pointString = points.map(point => `${point.x},${point.y}`).join(' ');
-  const labelStep = Math.max(1, Math.ceil(points.length / 6));
-
-  return (
-    <Svg width={chartWidth} height={chartHeight}>
-      {[0, 25, 50, 75, 100].map(value => {
-        const y = topPad + innerHeight - (value / 100) * innerHeight;
-
-        return (
-          <React.Fragment key={value}>
-            <Line x1={leftPad} y1={y} x2={chartWidth - rightPad} y2={y} stroke="#d7e4ec" strokeWidth="1" />
-            <SvgText x={8} y={y + 4} fill="#43596b" fontSize="11">
-              {value}%
-            </SvgText>
-          </React.Fragment>
-        );
-      })}
-      <Rect
-        x={leftPad}
-        y={topPad}
-        width={innerWidth}
-        height={innerHeight}
-        fill="none"
-        stroke="#caddea"
-        strokeWidth="1"
-        rx="6"
-      />
-      <Polyline points={pointString} fill="none" stroke={COLORS.green} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
-      {points.map((point, index) => (
-        <React.Fragment key={`${point.x}-${index}`}>
-          {index % labelStep === 0 || index === points.length - 1 ? (
-            <SvgText x={point.x - 10} y={chartHeight - 14} fill="#43596b" fontSize="11">
-              {point.label}h
-            </SvgText>
-          ) : null}
-          <Circle cx={point.x} cy={point.y} r="4" fill="#ffffff" stroke={COLORS.greenDark} strokeWidth="2" />
-        </React.Fragment>
-      ))}
-    </Svg>
   );
 }
 
@@ -260,54 +147,9 @@ function AnomaliesList({ anomalies, onResolve }) {
   );
 }
 
-function PeakHours({ items }) {
-  if (!items.length) {
-    return (
-      <View style={styles.emptyState}>
-        <Clock3 color={COLORS.green} size={24} />
-        <View style={styles.emptyStateTextGroup}>
-          <Text style={styles.emptyTitle}>Sem horários de pico</Text>
-          <Text style={styles.emptyText}>Atualize os padrões para popular o top 5 de ocupação.</Text>
-        </View>
-      </View>
-    );
-  }
-
-  const maxValue = Math.max(...items.map(item => numberValue(item.ocupacao_media)), 1);
-
-  return (
-    <View style={styles.peakList}>
-      {items.slice(0, 5).map((item, index) => {
-        const value = numberValue(item.ocupacao_media);
-        const percent = Math.max(8, (value / maxValue) * 100);
-        const day = DAY_LABELS[item.dia] ?? 'Dia';
-
-        return (
-          <View key={`${item.dia}-${item.hora}-${index}`} style={styles.peakItem}>
-            <View style={styles.peakRank}>
-              <Text style={styles.peakRankText}>{index + 1}</Text>
-            </View>
-            <View style={styles.peakInfo}>
-              <View style={styles.peakTitleRow}>
-                <Text style={styles.peakTitle}>{day}, {String(item.hora).padStart(2, '0')}:00</Text>
-                <Text style={styles.peakConfidence}>{numberValue(item.confianca)}% confiança</Text>
-              </View>
-              <View style={styles.peakBarTrack}>
-                <View style={[styles.peakBar, { width: `${percent}%` }]} />
-              </View>
-              <Text style={styles.peakMeta}>{Math.round(value)} min de ocupação média</Text>
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function Dashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const [period, setPeriod] = useState('24h');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -328,7 +170,7 @@ export default function Dashboard() {
         setLoading(true);
       }
 
-      const response = await fetch(`${getApiBaseUrl()}/api/analytics/dashboard?periodo=${period}`);
+      const response = await fetch(`${getApiBaseUrl()}/api/analytics/dashboard?periodo=24h`);
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -344,7 +186,7 @@ export default function Dashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period]);
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -398,12 +240,8 @@ export default function Dashboard() {
   const kpis = data?.kpis ?? {};
   const occupancy = kpis.ocupacao ?? {};
   const turnover = kpis.rotatividade ?? {};
-  const permanence = kpis.permanencia ?? {};
-  const trend = getTrendMeta(kpis.tendencia?.direcao);
   const anomalies = data?.anomalias ?? [];
   const pendingAnomalies = anomalies.filter(item => !item.resolvido).length;
-  const indicators = data?.indicadores ?? [];
-  const peakHours = data?.horarios_pico ?? [];
 
   if (!checkedAuth || (loading && !data)) {
     return (
@@ -494,96 +332,41 @@ export default function Dashboard() {
               icon={RefreshCcw}
               tone={COLORS.orange}
             />
-            <KpiCard
-              width={kpiWidth}
-              title="Tempo médio"
-              value={`${Math.round(numberValue(permanence.tempo_medio_minutos))} min`}
-              helper="Permanência por ocupação"
-              icon={Clock3}
-              tone={COLORS.greenDark}
-            />
-            <KpiCard
-              width={kpiWidth}
-              title="Tendência"
-              value={trend.label}
-              helper={trend.helper}
-              icon={trend.Icon}
-              tone={trend.color}
-            />
           </View>
 
-          <View style={[styles.twoColumn, { flexDirection: isDesktop ? 'row' : 'column' }]}>
-            <View style={[styles.panel, styles.chartPanel, isDesktop ? styles.mainPanel : null]}>
-              <View style={styles.panelHeader}>
-                <View>
-                  <Text style={styles.panelTitle}>Gráfico de ocupação</Text>
-                  <Text style={styles.panelSubtitle}>Últimas {period === '24h' ? '24 horas' : '48 horas'}</Text>
-                </View>
-                <View style={styles.segmentedControl}>
-                  {['24h', '48h'].map(item => (
-                    <Pressable
-                      key={item}
-                      accessibilityRole="button"
-                      style={[styles.segmentButton, period === item ? styles.segmentButtonActive : null]}
-                      onPress={() => setPeriod(item)}>
-                      <Text style={[styles.segmentText, period === item ? styles.segmentTextActive : null]}>{item}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+          <View style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <View>
+                <Text style={styles.panelTitle}>Resumo</Text>
+                <Text style={styles.panelSubtitle}>Saúde da operação</Text>
               </View>
-              <OccupancyChart data={indicators} width={isDesktop ? contentWidth * 0.62 : contentWidth - 48} />
             </View>
-
-            <View style={[styles.panel, isDesktop ? styles.sidePanel : null]}>
-              <View style={styles.panelHeader}>
-                <View>
-                  <Text style={styles.panelTitle}>Resumo</Text>
-                  <Text style={styles.panelSubtitle}>Saúde da operação</Text>
-                </View>
+            <View style={styles.summaryList}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Anomalias pendentes</Text>
+                <Text style={[styles.summaryValue, pendingAnomalies ? styles.summaryDanger : null]}>{pendingAnomalies}</Text>
               </View>
-              <View style={styles.summaryList}>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Anomalias pendentes</Text>
-                  <Text style={[styles.summaryValue, pendingAnomalies ? styles.summaryDanger : null]}>{pendingAnomalies}</Text>
-                </View>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Anomalias recentes</Text>
-                  <Text style={styles.summaryValue}>{anomalies.length}</Text>
-                </View>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Variabilidade</Text>
-                  <Text style={styles.summaryValue}>{kpis.tendencia?.variabilidade ?? 'baixa'}</Text>
-                </View>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Atualizado</Text>
-                  <Text style={styles.summaryValue}>
-                    {lastUpdate ? lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                  </Text>
-                </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Anomalias recentes</Text>
+                <Text style={styles.summaryValue}>{anomalies.length}</Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Atualizado</Text>
+                <Text style={styles.summaryValue}>
+                  {lastUpdate ? lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                </Text>
               </View>
             </View>
           </View>
 
-          <View style={[styles.twoColumn, { flexDirection: isDesktop ? 'row' : 'column' }]}>
-            <View style={[styles.panel, isDesktop ? styles.mainPanel : null]}>
-              <View style={styles.panelHeader}>
-                <View>
-                  <Text style={styles.panelTitle}>Lista de anomalias</Text>
-                  <Text style={styles.panelSubtitle}>Tipo, vaga, severidade, data/hora e status</Text>
-                </View>
+          <View style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <View>
+                <Text style={styles.panelTitle}>Lista de anomalias</Text>
+                <Text style={styles.panelSubtitle}>Tipo, vaga, severidade, data/hora e status</Text>
               </View>
-              <AnomaliesList anomalies={anomalies} onResolve={handleResolve} />
             </View>
-
-            <View style={[styles.panel, isDesktop ? styles.sidePanel : null]}>
-              <View style={styles.panelHeader}>
-                <View>
-                  <Text style={styles.panelTitle}>Horários de pico</Text>
-                  <Text style={styles.panelSubtitle}>Top 5 horários mais ocupados</Text>
-                </View>
-              </View>
-              <PeakHours items={peakHours} />
-            </View>
+            <AnomaliesList anomalies={anomalies} onResolve={handleResolve} />
           </View>
         </View>
       </ScrollView>

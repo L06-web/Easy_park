@@ -20,6 +20,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const [mode, setMode] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -187,7 +188,20 @@ export default function LoginScreen() {
                   placeholder="Confirmar nova senha"
                   value={form.confirmarSenha}
                   onChangeText={value => updateField('confirmarSenha', value)}
-                  secureTextEntry={!showPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  rightAction={
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Mostrar confirmação de senha'}
+                      hitSlop={10}
+                      onPress={() => setShowConfirmPassword(current => !current)}>
+                      {showConfirmPassword ? (
+                        <EyeOff color="#7b8d9b" size={21} />
+                      ) : (
+                        <Eye color="#7b8d9b" size={21} />
+                      )}
+                    </Pressable>
+                  }
                 />
               ) : null}
 
