@@ -36,7 +36,7 @@ const COLORS = {
   yellow: '#d99a18',
 };
 
-const DASHBOARD_REFRESH_INTERVAL_MS = 3000;
+const DASHBOARD_REFRESH_INTERVAL_MS = 1000;
 
 function numberValue(value, fallback = 0) {
   const numeric = Number(value);

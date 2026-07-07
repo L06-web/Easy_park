@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Clock3 } from 'lucide-react-native';
 
 // interface ParkingCardProps {
 //     livres: number;
 //     ocupadas: number;
 //     reservadas: number;
-//     valorHora: string;
 //     onPressReservar: () => void;
 // }
 
@@ -14,7 +12,6 @@ export default function ParkingCard({
     livres, 
     ocupadas, 
     reservadas, 
-    valorHora, 
     onPressReservar,
     actionLabel = 'Reservar Vaga',
     actionVariant = 'reserve',
@@ -58,10 +55,6 @@ export default function ParkingCard({
 
         <View style={styles.footer}>
         <Text style={styles.footerText}>{selectionSummary || `${porcentagemDisponivel}% disponivel`}</Text>
-        <View style={styles.priceBadge}>
-            <Clock3 color="#42596a" size={16} />
-            <Text style={styles.priceText}>R$ {valorHora}/hora</Text>
-        </View>
         </View>
 
         <TouchableOpacity
@@ -133,18 +126,6 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     footerText: { flex: 1, color: '#43596b', fontSize: 14, fontWeight: '600' },
-    priceBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#caddea',
-        backgroundColor: '#ffffff',
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-    },
-    priceText: { color: '#10212d', fontSize: 14, fontWeight: '800' },
     button: {
         backgroundColor: '#519b6d',
         borderRadius: 10,

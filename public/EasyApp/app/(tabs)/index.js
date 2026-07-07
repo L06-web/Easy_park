@@ -8,9 +8,8 @@ import {
     View,
     ScrollView,
     Text,
-    TextInput,
 } from 'react-native';
-import { Filter, LogOut, MapPin, Search } from 'lucide-react-native';
+import { LogOut, MapPin } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import ParkingCard from '../../components/ParkingCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -81,7 +80,7 @@ export default function TabOneScreen() {
         fetchData();
         const interval = setInterval(fetchData, 3000);
         return () => clearInterval(interval);
-    }, []);
+    }, [API_BASE_URL]);
 
     useEffect(() => {
         const loadUser = async () => {
@@ -224,18 +223,6 @@ export default function TabOneScreen() {
                     </View>
                 </View>
 
-                <View style={styles.searchSection}>
-                    <View style={styles.searchBar}>
-                        <Search color="#42596a" size={20} />
-                        <TextInput
-                            placeholder="Vagas de Estacionamento"
-                            placeholderTextColor="#465f70"
-                            style={styles.searchInput}
-                        />
-                        <Filter color="#42596a" size={20} />
-                    </View>
-                </View>
-
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     keyboardDismissMode="on-drag"
@@ -268,7 +255,6 @@ export default function TabOneScreen() {
                         livres={campos.livres}
                         ocupadas={campos.ocupadas}
                         reservadas={campos.reservadas}
-                        valorHora="2,00"
                         onPressReservar={handleReservarVaga}
                         actionLabel={actionLabel}
                         actionVariant={actionVariant}
@@ -321,24 +307,6 @@ const styles = StyleSheet.create({
     logoutButtonPressed: {
         opacity: 0.8,
     },
-    searchSection: { paddingHorizontal: 20, marginBottom: 14 },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: '#f4f8fc',
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#caddea',
-        height: 48,
-        paddingHorizontal: 13,
-        shadowColor: '#000000',
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 4,
-    },
-    searchInput: { flex: 1, color: '#10212d', fontSize: 14 },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
     mapContainer: {
         height: 360,
@@ -354,10 +322,6 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 8 },
         elevation: 6,
     },
-    filterRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-    badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
-    dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-    badgeText: { fontSize: 12, fontWeight: 'bold' },
     locationHeader: {
         flexDirection: 'row',
         alignItems: 'flex-start',
